@@ -97,6 +97,19 @@ const compareImg       = $<HTMLImageElement>('compareImg');
 const compareCanvas    = $<HTMLCanvasElement>('compareCanvas');
 const compareDivider   = $('compareDivider');
 
+// Hacker overlay
+const hackerEnableTgl  = $('hackerEnableToggle');
+const hackerControlsBox= $('hackerControlsBox');
+const hackerDensitySlider = $<HTMLInputElement>('hackerDensitySlider');
+const hackerDensityVal    = $('hackerDensityVal');
+const hackerSpeedSlider   = $<HTMLInputElement>('hackerSpeedSlider');
+const hackerSpeedVal      = $('hackerSpeedVal');
+const hackerGlitchSlider  = $<HTMLInputElement>('hackerGlitchSlider');
+const hackerGlitchVal     = $('hackerGlitchVal');
+const hackerWiresTgl      = $('hackerWiresToggle');
+const hackerDupTgl        = $('hackerDupToggle');
+const hackerColorInput    = $<HTMLInputElement>('hackerColor');
+
 // Mask controls
 const maskProgressSlider = $<HTMLInputElement>('maskProgressSlider');
 const maskProgressVal    = $('maskProgressVal');
@@ -154,6 +167,14 @@ const S = {
   vignette:      0,
   grain:         0,
   glow:          0,
+  // Hacker overlay
+  hackerOn:      false,
+  hackerDensity: 50,   // 10-100
+  hackerSpeed:   3,    // 0-20 (refresh rate)
+  hackerGlitch:  20,   // 0-100 (displacement)
+  hackerWires:   true,
+  hackerDup:     true, // duplicate panels at offsets
+  hackerColor:   '#ffffff',
 };
 
 // Mask state
@@ -202,10 +223,12 @@ const CELL = 9;                                       // ↑ from 6 — much sha
 const DPR  = Math.min(2, window.devicePixelRatio || 1); // hi-DPI rendering
 const ctx  = canvasEl.getContext('2d', { willReadFrequently: true })!;
 
-// State for runtime: webcam, compare
+// State for runtime: webcam, compare, hacker overlay
 let webcamStream: MediaStream | null = null;
 let webcamRaf:    number | null      = null;
 let compareMode   = false;
+let hackerRaf:    number | null      = null;
+let hackerSeed    = 1234;            // varies with time; controls all hacker randomness
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
@@ -358,6 +381,14 @@ const PRESETS: Record<string, Preset> = {
   'halftone-print': {
     M: { direction: 'lr', duration: 2.0, easing: 'in-out', flipDuration: 0.5, colorMode: 'fade-grey', vertJitter: 0, waveAmount: 0, edgeNoise: 0 },
     S: { renderMode: 'halftone', theme: 'custom', themeFg: '#7c5cfc', themeBg: '#f4f4ff', invert: true, autoContrast: true },
+  },
+  // Hacker / debugger aesthetic — B&W dithered + synthetic terminal overlays + heavy glitch
+  hacker: {
+    M: { direction: 'random', duration: 1.5, easing: 'linear', flipDuration: 0.4, colorMode: 'glitch', vertJitter: 3 },
+    S: { renderMode: 'bayer', theme: 'mono', invert: false, autoContrast: true,
+         hackerOn: true, hackerDensity: 75, hackerSpeed: 4, hackerGlitch: 35,
+         hackerWires: true, hackerDup: true, hackerColor: '#ffffff',
+         scanlines: 20, grain: 15 },
   },
 };
 
@@ -563,6 +594,182 @@ function positionOriginMarker() {
   originMarker.style.top  = `${yPct * logH * scale}px`;
 }
 
+// ── Hacker overlay ────────────────────────────────────────────────────────────
+
+const REG_NAMES = ['eax','ebx','ecx','edx','esi','edi','esp','ebp','r8','r9','r10','r11','r12','r13','args','argv','argc','loc','data'];
+const OP_CODES  = ['mov','push','pop','call','jmp','jnz','jz','cmp','add','sub','xor','and','or','lea','ret','int','test','shl','shr','nop'];
+const PANEL_TYPES = ['Memory', 'Registers', 'Assembly', 'Stack'];
+
+// Deterministic random from a seed (avoids Math.random() so seed controls it all)
+function rng(seed: number) { const x = Math.sin(seed * 12.9898) * 43758.5453; return x - Math.floor(x); }
+function pick<T>(arr: T[], seed: number): T { return arr[Math.floor(rng(seed) * arr.length)]; }
+function hex(n: number, digits: number): string { return Math.floor(n).toString(16).toUpperCase().padStart(digits, '0'); }
+
+function genMemoryLine(addr: number, seed: number): string {
+  const bytes = `${hex(rng(seed) * 256, 2)} ${hex(rng(seed + 0.1) * 256, 2)}`;
+  const off   = Math.floor(rng(seed + 0.2) * 64) + 40;
+  return `0000${hex(addr, 4)} ${bytes}   data+${off}`;
+}
+function genRegisterLine(seed: number): string {
+  const reg = pick(REG_NAMES, seed);
+  const val = Math.floor(rng(seed + 0.3) * 0xffff);
+  return `${reg.padEnd(5)} = 0x${hex(val, 4)}`;
+}
+function genAssemblyLine(addr: number, seed: number): string {
+  const op = pick(OP_CODES, seed);
+  const a  = pick(REG_NAMES.slice(0, 6), seed + 0.1);
+  const b  = rng(seed + 0.2) > 0.5
+    ? pick(REG_NAMES.slice(0, 6), seed + 0.3)
+    : '0x' + hex(rng(seed + 0.4) * 0xff, 2);
+  return `00${hex(addr, 6)} ${op.padEnd(5)} ${a},${b}`;
+}
+function genStackLine(seed: number): string {
+  return `[${hex(rng(seed) * 0xffff, 4)}] 0x${hex(rng(seed + 0.1) * 0xffffffff, 8)}`;
+}
+
+function drawHackerPanel(c: CanvasRenderingContext2D, x: number, y: number, kind: string, seedBase: number, color: string) {
+  const lines: string[] = [];
+  const linesCount = 8;
+  for (let i = 0; i < linesCount; i++) {
+    switch (kind) {
+      case 'Memory':    lines.push(genMemoryLine(0x11f25 + i * 0x12, seedBase + i * 7)); break;
+      case 'Registers': lines.push(genRegisterLine(seedBase + i * 11)); break;
+      case 'Assembly':  lines.push(genAssemblyLine(0x755fb + i * 4, seedBase + i * 13)); break;
+      case 'Stack':     lines.push(genStackLine(seedBase + i * 17)); break;
+    }
+  }
+  const FS = 9;
+  const LH = 11;
+  const width = 200;
+  const height = 18 + linesCount * LH;
+
+  c.save();
+  c.font = `${FS}px 'SF Mono','Menlo','Consolas',monospace`;
+  c.textBaseline = 'top';
+  c.fillStyle = 'rgba(0,0,0,0.55)';
+  c.fillRect(x, y, width, height);
+  c.strokeStyle = color;
+  c.lineWidth = 0.5;
+  c.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+  c.fillStyle = color;
+  c.fillText(`— ${kind} ${'—'.repeat(Math.max(0, 20 - kind.length))}`, x + 6, y + 4);
+  for (let i = 0; i < linesCount; i++) {
+    // Occasional char glitch (replace a random char with a different one)
+    let line = lines[i];
+    if (rng(seedBase + i * 100) < 0.04) {
+      const idx = Math.floor(rng(seedBase + i * 101) * line.length);
+      line = line.substring(0, idx) + pick(['#','%','@','?','░','▓'], seedBase + i * 102) + line.substring(idx + 1);
+    }
+    c.fillText(line, x + 6, y + 16 + i * LH);
+  }
+  c.restore();
+}
+
+function drawWireframePyramid(c: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+  c.save();
+  c.strokeStyle = color;
+  c.lineWidth = 0.7;
+  c.globalAlpha = 0.85;
+  const s = size;
+  // Vanishing-point tunnel: 4 nested rectangles converging
+  for (let i = 0; i < 4; i++) {
+    const r = s * (0.2 + i * 0.2);
+    c.strokeRect(x + s/2 - r/2, y + s/2 - r/2, r, r);
+  }
+  // Diagonals
+  c.beginPath();
+  c.moveTo(x, y); c.lineTo(x + s, y + s);
+  c.moveTo(x + s, y); c.lineTo(x, y + s);
+  c.stroke();
+  c.restore();
+}
+
+function drawGlitchBands(c: CanvasRenderingContext2D, src: HTMLCanvasElement, w: number, h: number, amount: number, seedBase: number) {
+  if (amount <= 0) return;
+  const bands = Math.floor(amount / 8);
+  for (let i = 0; i < bands; i++) {
+    const yPos = rng(seedBase + i * 19) * h;
+    const bh   = 2 + rng(seedBase + i * 23) * 14;
+    const dx   = (rng(seedBase + i * 29) - 0.5) * (amount * 0.6);
+    c.drawImage(src, 0, yPos, w, bh, dx, yPos, w, bh);
+  }
+}
+
+function drawHackerOverlay(c: CanvasRenderingContext2D, w: number, h: number) {
+  if (!S.hackerOn) return;
+  const color   = S.hackerColor;
+  const dens    = S.hackerDensity / 100;
+  const seedBase = hackerSeed;
+
+  // Glitch bands — use a snapshot of the current canvas as source
+  if (S.hackerGlitch > 0) {
+    // For glitch, we copy back rows from canvas itself
+    drawGlitchBands(c, canvasEl, w, h, S.hackerGlitch, seedBase);
+  }
+
+  // Pick which panels to draw based on density
+  const panelCount = Math.round(2 + dens * 5); // 2-7 panels
+  const positions: Array<[number, number]> = [
+    [10, 10], [w - 210, 10],
+    [10, h / 2 - 50], [w - 210, h / 2 - 50],
+    [10, h - 110], [w - 210, h - 110],
+    [w / 2 - 100, h - 110],
+  ];
+  for (let i = 0; i < Math.min(panelCount, positions.length); i++) {
+    const [px, py] = positions[i];
+    const kind = PANEL_TYPES[i % PANEL_TYPES.length];
+    drawHackerPanel(c, px, py, kind, seedBase + i * 137, color);
+    // Duplicate slightly offset for glitched-print feel
+    if (S.hackerDup && rng(seedBase + i * 200) < 0.5) {
+      drawHackerPanel(c, px + 4 + rng(seedBase + i * 201) * 12, py + 2, kind, seedBase + i * 137 + 50, color);
+    }
+  }
+
+  // Wireframes in corners
+  if (S.hackerWires) {
+    const sz = Math.min(90, w * 0.1);
+    drawWireframePyramid(c, 8,           8,           sz, color);
+    drawWireframePyramid(c, w - sz - 8,  8,           sz, color);
+    if (dens > 0.6) {
+      drawWireframePyramid(c, w / 2 - sz / 2, 8, sz, color);
+    }
+  }
+}
+
+// Animation loop — refreshes hackerSeed at the configured rate
+function hackerTick() {
+  if (!S.hackerOn) { hackerRaf = null; return; }
+  // Update seed at hackerSpeed Hz
+  const speed = S.hackerSpeed;
+  if (speed > 0) hackerSeed += speed * 0.1;
+  // Re-render the current frame (which will now call drawHackerOverlay)
+  if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+  else renderFrame(currentFrame);
+  // Throttle to ~24fps for performance
+  hackerRaf = window.setTimeout(() => requestAnimationFrame(hackerTick), 1000 / 24);
+}
+
+function startHackerLoop() {
+  if (hackerRaf !== null) return;
+  hackerTick();
+}
+function stopHackerLoop() {
+  if (hackerRaf !== null) { clearTimeout(hackerRaf); hackerRaf = null; }
+}
+
+// Wire up controls
+makeToggle(hackerEnableTgl, false, v => {
+  S.hackerOn = v;
+  hackerControlsBox.style.display = v ? 'block' : 'none';
+  if (v) startHackerLoop(); else { stopHackerLoop(); if (asciiFrames.length) renderFrame(currentFrame); }
+});
+makeSlider(hackerDensitySlider, hackerDensityVal, v => `${v}%`, v => { S.hackerDensity = v; });
+makeSlider(hackerSpeedSlider,   hackerSpeedVal,   v => `${v}`,  v => { S.hackerSpeed   = v; });
+makeSlider(hackerGlitchSlider,  hackerGlitchVal,  v => `${v}%`, v => { S.hackerGlitch  = v; });
+makeToggle(hackerWiresTgl, true,  v => { S.hackerWires = v; });
+makeToggle(hackerDupTgl,   true,  v => { S.hackerDup   = v; });
+hackerColorInput.addEventListener('input', () => { S.hackerColor = hackerColorInput.value; });
+
 // ── Webcam ────────────────────────────────────────────────────────────────────
 
 btnWebcam.addEventListener('click', async () => {
@@ -716,6 +923,20 @@ function syncSettingsUI() {
   smoothMergeTgl.classList.toggle('on',  S.smoothMerge);
   reverseToggle.classList.toggle('on',   M.reverse);
   edgeRow.style.display = S.edgeOn ? 'flex' : 'none';
+
+  // Hacker overlay
+  hackerEnableTgl.classList.toggle('on', S.hackerOn);
+  hackerControlsBox.style.display = S.hackerOn ? 'block' : 'none';
+  hackerDensitySlider.value = String(S.hackerDensity); hackerDensityVal.textContent = `${S.hackerDensity}%`;
+  hackerSpeedSlider.value   = String(S.hackerSpeed);   hackerSpeedVal.textContent   = `${S.hackerSpeed}`;
+  hackerGlitchSlider.value  = String(S.hackerGlitch);  hackerGlitchVal.textContent  = `${S.hackerGlitch}%`;
+  hackerWiresTgl.classList.toggle('on', S.hackerWires);
+  hackerDupTgl.classList.toggle('on',   S.hackerDup);
+  hackerColorInput.value = S.hackerColor;
+
+  // Start/stop loop based on enabled state
+  if (S.hackerOn) startHackerLoop();
+  else            stopHackerLoop();
 }
 
 // Load shared state on init
@@ -1165,6 +1386,7 @@ function renderFrame(fi: number) {
   }
 
   drawOverlay(ctx, cw, ch);
+  drawHackerOverlay(ctx, cw, ch);
   applyZoom(zoomPct);
   frameLabel.textContent = `${fi + 1} / ${asciiFrames.length}`;
   frameSlider.value = String(fi);
@@ -1468,6 +1690,7 @@ function renderMaskFrame(t: number, frame: AsciiResult) {
   }
 
   drawOverlay(ctx, cw, ch);
+  drawHackerOverlay(ctx, cw, ch);
   applyZoom(zoomPct);
 }
 

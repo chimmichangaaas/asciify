@@ -712,6 +712,7 @@
         <button class="preset-chip" data-preset="wave">Wave</button>
         <button class="preset-chip" data-preset="shatter">Shatter</button>
         <button class="preset-chip" data-preset="halftone-print" style="border-color:#7c5cfc;color:#7c5cfc;">Halftone Print</button>
+        <button class="preset-chip" data-preset="hacker" style="border-color:#00ff88;color:#00ff88;">Hacker</button>
       </div>
 
       <!-- Direction grid -->
@@ -819,6 +820,43 @@
           <span class="val" id="edgeNoiseVal">0%</span>
         </div>
         <input type="range" id="edgeNoiseSlider" min="0" max="50" step="1" value="0" />
+      </div>
+    </div>
+
+    <!-- ── HACKER OVERLAY ── -->
+    <div class="section">
+      <div class="section-title" style="color:#00ff88;">⌨ Hacker Overlay</div>
+
+      <div class="toggle-wrap">
+        <label>Enable</label>
+        <div class="toggle" id="hackerEnableToggle"></div>
+      </div>
+
+      <div id="hackerControlsBox" style="display:none;">
+        <div class="ctrl-slider ctrl">
+          <div class="ctrl-head"><label>Density</label><span class="val" id="hackerDensityVal">50%</span></div>
+          <input type="range" id="hackerDensitySlider" min="10" max="100" step="5" value="50" />
+        </div>
+        <div class="ctrl-slider ctrl">
+          <div class="ctrl-head"><label>Update Speed</label><span class="val" id="hackerSpeedVal">3</span></div>
+          <input type="range" id="hackerSpeedSlider" min="0" max="20" step="1" value="3" />
+        </div>
+        <div class="ctrl-slider ctrl">
+          <div class="ctrl-head"><label>Glitch Displacement</label><span class="val" id="hackerGlitchVal">20%</span></div>
+          <input type="range" id="hackerGlitchSlider" min="0" max="100" step="5" value="20" />
+        </div>
+        <div class="toggle-wrap">
+          <label>Wireframe shapes</label>
+          <div class="toggle on" id="hackerWiresToggle"></div>
+        </div>
+        <div class="toggle-wrap">
+          <label>Panel duplicates</label>
+          <div class="toggle on" id="hackerDupToggle"></div>
+        </div>
+        <div class="ctrl">
+          <label>Text color</label>
+          <input type="color" id="hackerColor" value="#ffffff" />
+        </div>
       </div>
     </div>
 
