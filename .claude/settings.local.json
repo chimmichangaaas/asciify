@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Read(//private/tmp/**)",
+      "Bash(rm -rf ascii-view)",
+      "Bash(gh repo *)",
+      "Bash(node build.mjs)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git -c user.email=dev@local -c user.name=dev commit -q -m 'v1: full ASCII Studio dashboard before hacker overlay effect *)",
+      "Bash(git tag *)"
+    ]
+  }
+}

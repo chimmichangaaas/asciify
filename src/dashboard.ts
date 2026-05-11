@@ -1,0 +1,1888 @@
+import { imageDataToAscii, AsciiResult } from './ascii';
+import { decodeImageFile } from './decode-image';
+import { decodeGifFile }   from './decode-gif';
+import { decodeVideoFile } from './decode-video';
+import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+const dropZone         = $('dropZone');
+const fileInput        = $<HTMLInputElement>('fileInput');
+const thumbImg         = $<HTMLImageElement>('thumbImg');
+const dropFileName     = $('dropFileName');
+const rampInput        = $<HTMLInputElement>('ramp');
+const rampRow          = $('rampRow');
+const renderModeSelect = $<HTMLSelectElement>('renderModeSelect');
+const widthSlider      = $<HTMLInputElement>('widthSlider');
+const widthVal         = $('widthVal');
+const colorToggle      = $('colorToggle');
+const invertToggle     = $('invertToggle');
+const autoContrastTgl  = $('autoContrastToggle');
+const cellAspectSlider = $<HTMLInputElement>('cellAspectSlider');
+const cellAspectVal    = $('cellAspectVal');
+const edgeToggle       = $('edgeToggle');
+const edgeRow          = $('edgeRow');
+const edgeSlider       = $<HTMLInputElement>('edgeSlider');
+const edgeVal          = $('edgeVal');
+const animSection      = $('animSection');
+const maxFramesSlider  = $<HTMLInputElement>('maxFramesSlider');
+const maxFramesVal     = $('maxFramesVal');
+const sampleFpsSlider  = $<HTMLInputElement>('sampleFpsSlider');
+const sampleFpsVal     = $('sampleFpsVal');
+const gifCellSlider    = $<HTMLInputElement>('gifCellSlider');
+const gifCellVal       = $('gifCellVal');
+const blendStepsSlider = $<HTMLInputElement>('blendStepsSlider');
+const blendStepsVal    = $('blendStepsVal');
+const holdFramesSlider = $<HTMLInputElement>('holdFramesSlider');
+const holdFramesVal    = $('holdFramesVal');
+const smoothMergeRow   = $('smoothMergeRow');
+const smoothMergeTgl   = $('smoothMergeToggle');
+const btnReset         = $<HTMLButtonElement>('btnReset');
+const btnPng           = $<HTMLButtonElement>('btnPng');
+const btnGif           = $<HTMLButtonElement>('btnGif');
+const statusBar        = $('statusBar');
+const infoLabel        = $('infoLabel');
+const canvasEl         = $<HTMLCanvasElement>('preview');
+const emptyState       = $('emptyState');
+const scrubber         = $('scrubber');
+const frameSlider      = $<HTMLInputElement>('frameSlider');
+const frameLabel       = $('frameLabel');
+const playBtn          = $<HTMLButtonElement>('playBtn');
+const zoomIn           = $<HTMLButtonElement>('zoomIn');
+const zoomOut          = $<HTMLButtonElement>('zoomOut');
+const zoomFit          = $<HTMLButtonElement>('zoomFit');
+const zoomLabel        = $('zoomLabel');
+const canvasWrap       = $('canvasWrap');
+const originMarker     = $('originMarker');
+
+// Quick action buttons
+const btnWebcam        = $<HTMLButtonElement>('btnWebcam');
+const btnCompare       = $<HTMLButtonElement>('btnCompare');
+const btnShare         = $<HTMLButtonElement>('btnShare');
+
+// Theme
+const themeRow         = $('themeRow');
+const customThemeBox   = $('customThemeBox');
+const themeFg          = $<HTMLInputElement>('themeFg');
+const themeBg          = $<HTMLInputElement>('themeBg');
+
+// Overlay
+const scanlinesSlider  = $<HTMLInputElement>('scanlinesSlider');
+const scanlinesVal     = $('scanlinesVal');
+const vignetteSlider   = $<HTMLInputElement>('vignetteSlider');
+const vignetteVal      = $('vignetteVal');
+const grainSlider      = $<HTMLInputElement>('grainSlider');
+const grainVal         = $('grainVal');
+const glowSlider       = $<HTMLInputElement>('glowSlider');
+const glowVal          = $('glowVal');
+
+// Reverse + paint
+const reverseToggle    = $('reverseToggle');
+const paintHelp        = $('paintHelp');
+const btnClearPaint    = $<HTMLButtonElement>('btnClearPaint');
+
+// Export buttons
+const btnTxt           = $<HTMLButtonElement>('btnTxt');
+const btnSvg           = $<HTMLButtonElement>('btnSvg');
+const btnHtml          = $<HTMLButtonElement>('btnHtml');
+const btnMd            = $<HTMLButtonElement>('btnMd');
+const btnAnsi          = $<HTMLButtonElement>('btnAnsi');
+const btnExportRevealGif = $<HTMLButtonElement>('btnExportRevealGif');
+
+// Compare
+const compareWrap      = $('compareWrap');
+const compareImg       = $<HTMLImageElement>('compareImg');
+const compareCanvas    = $<HTMLCanvasElement>('compareCanvas');
+const compareDivider   = $('compareDivider');
+
+// Mask controls
+const maskProgressSlider = $<HTMLInputElement>('maskProgressSlider');
+const maskProgressVal    = $('maskProgressVal');
+const btnMaskReset       = $<HTMLButtonElement>('btnMaskReset');
+const btnMaskPlay        = $<HTMLButtonElement>('btnMaskPlay');
+const dirGrid            = $('dirGrid');
+const presetRow          = $('presetRow');
+const durationSlider     = $<HTMLInputElement>('durationSlider');
+const durationVal        = $('durationVal');
+const easingSelect       = $<HTMLSelectElement>('easingSelect');
+const flipDurSlider      = $<HTMLInputElement>('flipDurSlider');
+const flipDurVal         = $('flipDurVal');
+const flipRateSlider     = $<HTMLInputElement>('flipRateSlider');
+const flipRateVal        = $('flipRateVal');
+const vertJitterSlider   = $<HTMLInputElement>('vertJitterSlider');
+const vertJitterVal      = $('vertJitterVal');
+const flipCharsetInput   = $<HTMLInputElement>('flipCharsetInput');
+const waveAmtSlider      = $<HTMLInputElement>('waveAmtSlider');
+const waveAmtVal         = $('waveAmtVal');
+const waveFreqSlider     = $<HTMLInputElement>('waveFreqSlider');
+const waveFreqVal        = $('waveFreqVal');
+const edgeNoiseSlider    = $<HTMLInputElement>('edgeNoiseSlider');
+const edgeNoiseVal       = $('edgeNoiseVal');
+const colorModeSelect    = $<HTMLSelectElement>('colorModeSelect');
+const monoColorRow       = $('monoColorRow');
+const monoColorInput     = $<HTMLInputElement>('monoColorInput');
+
+// ── Settings state ────────────────────────────────────────────────────────────
+
+type SourceKind = 'image' | 'gif' | 'video';
+
+const S = {
+  ramp:          '@X&$#x*+=-. ',
+  widthChars:    130,
+  color:         true,
+  invert:        true,
+  autoContrast:  true,
+  cellAspect:    1.0,
+  edgeOn:        false,
+  edgeThreshold: 40,
+  maxFrames:     24,
+  sampleFps:     12,
+  gifCell:       6,
+  blendSteps:    20,
+  holdFrames:    5,
+  smoothMerge:   false,
+  // Render mode
+  renderMode:    'ascii' as 'ascii'|'halftone'|'block'|'geometric'|'braille'|'bayer',
+  // Theme
+  theme:         'auto' as 'auto'|'matrix'|'amber'|'cyber'|'mono'|'sepia'|'custom',
+  themeFg:       '#e6e6e6',
+  themeBg:       '#0a0a0c',
+  // Overlay
+  scanlines:     0,
+  vignette:      0,
+  grain:         0,
+  glow:          0,
+};
+
+// Mask state
+type Direction = 'lr'|'rl'|'tb'|'bt'|'tl-br'|'tr-bl'|'bl-tr'|'br-tl'|'radial-out'|'radial-in'|'random'|'diag-stripes'|'paint'|'multi-front';
+type Easing    = 'linear'|'in'|'out'|'in-out'|'step'|'exp';
+type ColorMode = 'fade-grey'|'glitch'|'mono'|'opacity'|'invert';
+
+const M = {
+  progress:     0,
+  direction:    'lr' as Direction,
+  duration:     2.0,
+  easing:       'linear' as Easing,
+  flipDuration: 0.6,
+  flipRate:     20,
+  vertJitter:   2,
+  flipCharset:  '01/\\_*+.-=',
+  waveAmount:   0,
+  waveFreq:     8,
+  edgeNoise:    0,
+  colorMode:    'fade-grey' as ColorMode,
+  monoColor:    '#ff8050',
+  reverse:      false,
+  origin:       null as { row: number, col: number } | null,
+  paintTimings: null as Map<number, number> | null,  // key=row*cols+col, val=order index
+  paintCount:   0,
+};
+
+// ── Runtime state ─────────────────────────────────────────────────────────────
+
+let lastFile:      File | null    = null;
+let rawFrames:     ImageData[]    = [];
+let rawDelays:     number[]       = [];
+let asciiFrames:   AsciiResult[]  = [];
+let currentKind:   SourceKind     = 'image';
+let zoomPct        = 100;
+let playing        = false;
+let currentFrame   = 0;
+let animTimer:     number | null  = null;
+let maskRaf:       number | null  = null;
+let maskPlayStart: number | null  = null; // timestamp when play began
+let maskPlayFrom:  number         = 0;   // progress value when play began
+
+// ── Canvas context ────────────────────────────────────────────────────────────
+
+const CELL = 9;                                       // ↑ from 6 — much sharper preview
+const DPR  = Math.min(2, window.devicePixelRatio || 1); // hi-DPI rendering
+const ctx  = canvasEl.getContext('2d', { willReadFrequently: true })!;
+
+// State for runtime: webcam, compare
+let webcamStream: MediaStream | null = null;
+let webcamRaf:    number | null      = null;
+let compareMode   = false;
+
+// ── Status ────────────────────────────────────────────────────────────────────
+
+function setStatus(msg: string, cls: '' | 'ok' | 'err' = '') {
+  statusBar.textContent = msg;
+  statusBar.className   = cls;
+}
+
+// ── Toggle helper ─────────────────────────────────────────────────────────────
+
+function isOn(el: HTMLElement) { return el.classList.contains('on'); }
+
+function makeToggle(el: HTMLElement, initial: boolean, onChange: (on: boolean) => void) {
+  el.classList.toggle('on', initial);
+  el.addEventListener('click', () => {
+    el.classList.toggle('on');
+    onChange(el.classList.contains('on'));
+  });
+}
+
+// ── Slider helper ─────────────────────────────────────────────────────────────
+
+function makeSlider(
+  slider: HTMLInputElement,
+  valEl: HTMLElement,
+  fmt: (v: number) => string,
+  onChange: (v: number) => void,
+  onFinish?: (v: number) => void,
+) {
+  const read = () => parseFloat(slider.value);
+  slider.addEventListener('input', () => {
+    valEl.textContent = fmt(read());
+    onChange(read());
+  });
+  if (onFinish) {
+    slider.addEventListener('change', () => onFinish(read()));
+  }
+  // Init display
+  valEl.textContent = fmt(read());
+  onChange(read());
+}
+
+// ── Wire up settings controls ─────────────────────────────────────────────────
+
+makeToggle(colorToggle,    S.color,       v => { S.color       = v; onSettingsChange(); });
+makeToggle(invertToggle,   S.invert,      v => { S.invert      = v; onSettingsChange(); });
+makeToggle(autoContrastTgl,S.autoContrast,v => { S.autoContrast= v; onSettingsChange(); });
+makeToggle(edgeToggle,     S.edgeOn,      v => {
+  S.edgeOn = v;
+  edgeRow.style.display = v ? 'flex' : 'none';
+  onSettingsChange();
+});
+makeToggle(smoothMergeTgl, S.smoothMerge, v => { S.smoothMerge = v; });
+
+// Width: show value live, rebuild on release
+makeSlider(widthSlider, widthVal, v => `${v}`,
+  v => { S.widthChars = v; },
+  _  => onSettingsChange(),
+);
+
+// Cell aspect: rebuild live (fast)
+makeSlider(cellAspectSlider, cellAspectVal, v => v.toFixed(2),
+  v => { S.cellAspect = v; onSettingsChange(); },
+);
+
+// Edge threshold: rebuild live
+makeSlider(edgeSlider, edgeVal, v => `${v}`,
+  v => { S.edgeThreshold = v; onSettingsChange(); },
+);
+
+// GIF export params: update value live, no visual rebuild needed
+makeSlider(gifCellSlider,    gifCellVal,    v => `${v} px`, v => { S.gifCell    = v; });
+makeSlider(blendStepsSlider, blendStepsVal, v => `${v}`,    v => { S.blendSteps = v; });
+makeSlider(holdFramesSlider, holdFramesVal, v => `${v}`,    v => { S.holdFrames = v; });
+
+// Max frames / sample FPS: re-decode the file on release (they affect decoding, not conversion)
+makeSlider(maxFramesSlider, maxFramesVal, v => `${v}`,
+  v => { S.maxFrames = v; },
+  _ => reloadFile(),
+);
+makeSlider(sampleFpsSlider, sampleFpsVal, v => `${v}`,
+  v => { S.sampleFps = v; },
+  _ => reloadFile(),
+);
+
+rampInput.addEventListener('change', () => { S.ramp = rampInput.value || ' '; onSettingsChange(); });
+
+renderModeSelect.addEventListener('change', () => {
+  S.renderMode = renderModeSelect.value as typeof S.renderMode;
+  // Hide ramp input for non-ASCII modes (their characters are fixed)
+  rampRow.style.display = S.renderMode === 'ascii' ? 'flex' : 'none';
+  onSettingsChange();
+});
+
+// ── Mask controls ─────────────────────────────────────────────────────────────
+
+// Mask style change — re-renders at the current scrubber position
+function maskStyleChange() { renderAtProgress(M.progress); }
+
+// Style sliders
+makeSlider(durationSlider,    durationVal,    v => `${v.toFixed(1)} s`,  v => { M.duration     = v; maskStyleChange(); });
+makeSlider(flipDurSlider,     flipDurVal,     v => `${v.toFixed(2)} s`,  v => { M.flipDuration = v; maskStyleChange(); });
+makeSlider(flipRateSlider,    flipRateVal,    v => `${v} ch/s`,          v => { M.flipRate     = v; maskStyleChange(); });
+makeSlider(vertJitterSlider,  vertJitterVal,  v => `${v} rows`,          v => { M.vertJitter   = v; maskStyleChange(); });
+makeSlider(waveAmtSlider,     waveAmtVal,     v => `${v}%`,              v => { M.waveAmount   = v; maskStyleChange(); });
+makeSlider(waveFreqSlider,    waveFreqVal,    v => `${v}`,               v => { M.waveFreq     = v; maskStyleChange(); });
+makeSlider(edgeNoiseSlider,   edgeNoiseVal,   v => `${v}%`,              v => { M.edgeNoise    = v; maskStyleChange(); });
+
+flipCharsetInput.addEventListener('input', () => {
+  M.flipCharset = flipCharsetInput.value || '*+=-_.';
+  maskStyleChange();
+});
+
+easingSelect.addEventListener('change', () => {
+  M.easing = easingSelect.value as Easing;
+  maskStyleChange();
+});
+
+colorModeSelect.addEventListener('change', () => {
+  M.colorMode = colorModeSelect.value as ColorMode;
+  monoColorRow.style.display = M.colorMode === 'mono' ? 'flex' : 'none';
+  maskStyleChange();
+});
+
+monoColorInput.addEventListener('input', () => {
+  M.monoColor = monoColorInput.value;
+  maskStyleChange();
+});
+
+// Direction grid — set active button + state
+dirGrid.querySelectorAll<HTMLButtonElement>('.dir-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    dirGrid.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    M.direction = btn.dataset.dir as Direction;
+    maskStyleChange();
+  });
+});
+
+// Presets — quick configurations (can patch both M and S)
+type Preset = { M?: Partial<typeof M>; S?: Partial<typeof S> };
+const PRESETS: Record<string, Preset> = {
+  wipe:    { M: { direction: 'lr',         duration: 1.5, easing: 'linear', flipDuration: 0.4, waveAmount: 0,  edgeNoise: 0,  colorMode: 'fade-grey', vertJitter: 0 } },
+  matrix:  { M: { direction: 'tb',         duration: 3.0, easing: 'linear', flipDuration: 1.0, waveAmount: 0,  edgeNoise: 15, colorMode: 'mono', monoColor: '#3ddc84', vertJitter: 1, flipCharset: '01ABCDEFGHJKLMNPQRSTUVWXYZ' } },
+  glitch:  { M: { direction: 'random',     duration: 0.8, easing: 'linear', flipDuration: 0.5, waveAmount: 0,  edgeNoise: 0,  colorMode: 'glitch', vertJitter: 4 } },
+  bloom:   { M: { direction: 'radial-out', duration: 2.5, easing: 'out',    flipDuration: 0.7, waveAmount: 8,  edgeNoise: 0,  colorMode: 'fade-grey', vertJitter: 0 } },
+  wave:    { M: { direction: 'lr',         duration: 2.5, easing: 'in-out', flipDuration: 0.6, waveAmount: 25, waveFreq: 6, edgeNoise: 5, colorMode: 'fade-grey', vertJitter: 0 } },
+  shatter: { M: { direction: 'radial-in',  duration: 1.8, easing: 'in',     flipDuration: 0.4, waveAmount: 0,  edgeNoise: 30, colorMode: 'glitch', vertJitter: 6 } },
+  // Halftone print look — switches render mode + duotone purple/white theme
+  'halftone-print': {
+    M: { direction: 'lr', duration: 2.0, easing: 'in-out', flipDuration: 0.5, colorMode: 'fade-grey', vertJitter: 0, waveAmount: 0, edgeNoise: 0 },
+    S: { renderMode: 'halftone', theme: 'custom', themeFg: '#7c5cfc', themeBg: '#f4f4ff', invert: true, autoContrast: true },
+  },
+};
+
+presetRow.querySelectorAll<HTMLButtonElement>('.preset-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const preset = PRESETS[chip.dataset.preset!];
+    if (!preset) return;
+    if (preset.M) Object.assign(M, preset.M);
+    if (preset.S) {
+      Object.assign(S, preset.S);
+      // Sync the relevant UI bits + rebuild ASCII (since render mode / theme changed)
+      syncSettingsUI();
+      buildAscii();
+    } else {
+      maskStyleChange();
+    }
+    syncMaskUI();
+  });
+});
+
+function syncMaskUI() {
+  durationSlider.value     = String(M.duration);    durationVal.textContent    = `${M.duration.toFixed(1)} s`;
+  flipDurSlider.value      = String(M.flipDuration);flipDurVal.textContent     = `${M.flipDuration.toFixed(2)} s`;
+  flipRateSlider.value     = String(M.flipRate);    flipRateVal.textContent    = `${M.flipRate} ch/s`;
+  vertJitterSlider.value   = String(M.vertJitter);  vertJitterVal.textContent  = `${M.vertJitter} rows`;
+  waveAmtSlider.value      = String(M.waveAmount);  waveAmtVal.textContent     = `${M.waveAmount}%`;
+  waveFreqSlider.value     = String(M.waveFreq);    waveFreqVal.textContent    = `${M.waveFreq}`;
+  edgeNoiseSlider.value    = String(M.edgeNoise);   edgeNoiseVal.textContent   = `${M.edgeNoise}%`;
+  flipCharsetInput.value   = M.flipCharset;
+  easingSelect.value       = M.easing;
+  colorModeSelect.value    = M.colorMode;
+  monoColorInput.value     = M.monoColor;
+  monoColorRow.style.display = M.colorMode === 'mono' ? 'flex' : 'none';
+  dirGrid.querySelectorAll<HTMLButtonElement>('.dir-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.dir === M.direction);
+  });
+}
+
+// Progress scrubber — direct control
+maskProgressSlider.addEventListener('input', () => {
+  stopMaskPlay();
+  const p = parseInt(maskProgressSlider.value) / 100;
+  M.progress = p;
+  maskProgressVal.textContent = `${maskProgressSlider.value}%`;
+  renderAtProgress(p);
+});
+
+btnMaskReset.addEventListener('click', () => {
+  stopMaskPlay();
+  M.progress = 0;
+  maskProgressSlider.value = '0';
+  maskProgressVal.textContent = '0%';
+  renderAtProgress(0);
+});
+
+btnMaskPlay.addEventListener('click', () => {
+  if (maskPlayStart !== null) { stopMaskPlay(); return; }
+  if (M.progress >= 1) {
+    M.progress = 0;
+    maskProgressSlider.value = '0';
+    maskProgressVal.textContent = '0%';
+  }
+  maskPlayFrom  = M.progress;
+  maskPlayStart = performance.now();
+  btnMaskPlay.textContent = '⏸ Pause';
+  requestAnimationFrame(maskPlayTick);
+});
+
+// ── Theme + Overlay wiring ────────────────────────────────────────────────────
+
+themeRow.querySelectorAll<HTMLButtonElement>('.preset-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    themeRow.querySelectorAll('.preset-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    S.theme = chip.dataset.theme as typeof S.theme;
+    customThemeBox.style.display = S.theme === 'custom' ? 'block' : 'none';
+    if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+    else renderFrame(currentFrame);
+  });
+});
+
+themeFg.addEventListener('input', () => {
+  S.themeFg = themeFg.value;
+  if (S.theme === 'custom') {
+    if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+    else renderFrame(currentFrame);
+  }
+});
+themeBg.addEventListener('input', () => {
+  S.themeBg = themeBg.value;
+  if (S.theme === 'custom') {
+    if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+    else renderFrame(currentFrame);
+  }
+});
+
+makeSlider(scanlinesSlider, scanlinesVal, v => `${v}%`, v => {
+  S.scanlines = v;
+  if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress); else renderFrame(currentFrame);
+});
+makeSlider(vignetteSlider, vignetteVal, v => `${v}%`, v => {
+  S.vignette = v;
+  if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress); else renderFrame(currentFrame);
+});
+makeSlider(grainSlider, grainVal, v => `${v}%`, v => {
+  S.grain = v;
+  if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress); else renderFrame(currentFrame);
+});
+makeSlider(glowSlider, glowVal, v => `${v}%`, v => {
+  S.glow = v;
+  if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress); else renderFrame(currentFrame);
+});
+
+// Reverse toggle
+makeToggle(reverseToggle, false, v => { M.reverse = v; renderAtProgress(M.progress); });
+
+// Paint mode help row
+function updateDirectionUI() {
+  paintHelp.style.display = M.direction === 'paint' ? 'block' : 'none';
+  // Show origin marker only for radial directions
+  const showMarker = (M.direction === 'radial-out' || M.direction === 'radial-in') && M.origin !== null;
+  originMarker.style.display = showMarker ? 'block' : 'none';
+  positionOriginMarker();
+}
+
+// Hook into existing direction grid clicks
+dirGrid.querySelectorAll<HTMLButtonElement>('.dir-btn').forEach(btn => {
+  btn.addEventListener('click', () => updateDirectionUI());
+});
+
+btnClearPaint.addEventListener('click', () => {
+  M.paintTimings = null;
+  M.paintCount = 0;
+  renderAtProgress(M.progress);
+});
+
+// Canvas click → set origin (for radial) or paint (for paint mode)
+function canvasToCell(e: MouseEvent): { row: number; col: number } | null {
+  const frame = asciiFrames[currentFrame] || asciiFrames[0];
+  if (!frame) return null;
+  const rect = canvasEl.getBoundingClientRect();
+  const xPct = (e.clientX - rect.left) / rect.width;
+  const yPct = (e.clientY - rect.top)  / rect.height;
+  const cols = frame.text.split('\n').reduce((m, l) => Math.max(m, l.length), 0);
+  const rows = frame.text.split('\n').length;
+  return {
+    col: Math.max(0, Math.min(cols - 1, Math.floor(xPct * cols))),
+    row: Math.max(0, Math.min(rows - 1, Math.floor(yPct * rows))),
+  };
+}
+
+let painting = false;
+canvasEl.addEventListener('mousedown', e => {
+  if (M.direction === 'radial-out' || M.direction === 'radial-in') {
+    const cell = canvasToCell(e);
+    if (cell) {
+      M.origin = cell;
+      updateDirectionUI();
+      renderAtProgress(M.progress);
+    }
+  } else if (M.direction === 'paint') {
+    painting = true;
+    if (!M.paintTimings) { M.paintTimings = new Map(); M.paintCount = 0; }
+    paintAt(e);
+  }
+});
+canvasEl.addEventListener('mousemove', e => { if (painting) paintAt(e); });
+window.addEventListener('mouseup', () => { painting = false; });
+
+function paintAt(e: MouseEvent) {
+  const cell = canvasToCell(e);
+  if (!cell) return;
+  const frame = asciiFrames[currentFrame] || asciiFrames[0];
+  if (!frame) return;
+  const cols = frame.text.split('\n').reduce((m, l) => Math.max(m, l.length), 0);
+  // Add a small radius (3 cells) per move to make brush feel chunky
+  for (let dr = -2; dr <= 2; dr++) {
+    for (let dc = -2; dc <= 2; dc++) {
+      if (dr * dr + dc * dc > 4) continue;
+      const r = cell.row + dr, c = cell.col + dc;
+      if (r < 0 || c < 0 || c >= cols) continue;
+      const k = r * cols + c;
+      if (!M.paintTimings!.has(k)) {
+        M.paintTimings!.set(k, M.paintCount++);
+      }
+    }
+  }
+  renderAtProgress(M.progress);
+}
+
+function positionOriginMarker() {
+  if (!M.origin || !canvasEl.width) return;
+  const frame = asciiFrames[currentFrame] || asciiFrames[0];
+  if (!frame) return;
+  const cols = frame.text.split('\n').reduce((m, l) => Math.max(m, l.length), 0);
+  const rows = frame.text.split('\n').length;
+  const xPct = (M.origin.col + 0.5) / cols;
+  const yPct = (M.origin.row + 0.5) / rows;
+  const logW = canvasEl.width  / DPR;
+  const logH = canvasEl.height / DPR;
+  const scale = zoomPct / 100;
+  originMarker.style.left = `${xPct * logW * scale}px`;
+  originMarker.style.top  = `${yPct * logH * scale}px`;
+}
+
+// ── Webcam ────────────────────────────────────────────────────────────────────
+
+btnWebcam.addEventListener('click', async () => {
+  if (webcamStream) {
+    stopWebcam();
+    return;
+  }
+  try {
+    setStatus('Starting webcam…');
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+    webcamStream = stream;
+    btnWebcam.classList.add('active');
+    btnWebcam.textContent = '🛑 Stop Cam';
+
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    await video.play();
+
+    const w = video.videoWidth || 640;
+    const h = video.videoHeight || 480;
+    const tmp = document.createElement('canvas');
+    tmp.width = w; tmp.height = h;
+    const tc = tmp.getContext('2d', { willReadFrequently: true })!;
+
+    let lastT = 0;
+    const tick = (now: number) => {
+      if (!webcamStream) return;
+      // Throttle ~12 fps for ASCII conversion
+      if (now - lastT > 80) {
+        lastT = now;
+        tc.drawImage(video, 0, 0, w, h);
+        const img = tc.getImageData(0, 0, w, h);
+        rawFrames = [img];
+        rawDelays = [100];
+        currentKind = 'image';
+        try { buildAscii(); } catch {}
+      }
+      webcamRaf = requestAnimationFrame(tick);
+    };
+    webcamRaf = requestAnimationFrame(tick);
+    setStatus('● Webcam active', 'ok');
+  } catch (err) {
+    setStatus('Webcam denied or unavailable', 'err');
+  }
+});
+
+function stopWebcam() {
+  if (webcamStream) { webcamStream.getTracks().forEach(t => t.stop()); webcamStream = null; }
+  if (webcamRaf !== null) { cancelAnimationFrame(webcamRaf); webcamRaf = null; }
+  btnWebcam.classList.remove('active');
+  btnWebcam.textContent = '📷 Webcam';
+}
+
+// ── Compare mode ──────────────────────────────────────────────────────────────
+
+btnCompare.addEventListener('click', () => {
+  if (!rawFrames.length) return;
+  compareMode = !compareMode;
+  btnCompare.classList.toggle('active', compareMode);
+  if (compareMode) {
+    syncCompare();
+    compareWrap.classList.add('on');
+  } else {
+    compareWrap.classList.remove('on');
+  }
+});
+
+function syncCompare() {
+  if (!compareMode || !rawFrames.length) return;
+  // Original image
+  const tmp = document.createElement('canvas');
+  tmp.width = rawFrames[0].width; tmp.height = rawFrames[0].height;
+  tmp.getContext('2d')!.putImageData(rawFrames[0], 0, 0);
+  compareImg.src = tmp.toDataURL();
+  // ASCII canvas — copy current preview
+  const cc = compareCanvas.getContext('2d')!;
+  compareCanvas.width  = canvasEl.width;
+  compareCanvas.height = canvasEl.height;
+  cc.drawImage(canvasEl, 0, 0);
+}
+
+// Draggable divider
+let draggingDivider = false;
+compareDivider.addEventListener('mousedown', e => { draggingDivider = true; e.preventDefault(); });
+window.addEventListener('mouseup', () => { draggingDivider = false; });
+window.addEventListener('mousemove', e => {
+  if (!draggingDivider) return;
+  const rect = compareWrap.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+  compareDivider.style.left = `${pct}%`;
+  compareCanvas.style.clipPath = `inset(0 0 0 ${pct}%)`;
+});
+
+// ── Share via URL hash ────────────────────────────────────────────────────────
+
+btnShare.addEventListener('click', async () => {
+  const state = { S, M: { ...M, paintTimings: M.paintTimings ? Array.from(M.paintTimings.entries()) : null } };
+  const json = JSON.stringify(state);
+  const b64  = btoa(unescape(encodeURIComponent(json)));
+  const url  = `${location.origin}${location.pathname}#${b64}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    setStatus('✓ Share link copied to clipboard', 'ok');
+  } catch {
+    location.hash = b64;
+    setStatus('Link in URL bar — copy it', 'ok');
+  }
+});
+
+function loadFromHash() {
+  if (location.hash.length < 2) return;
+  try {
+    const json  = decodeURIComponent(escape(atob(location.hash.slice(1))));
+    const state = JSON.parse(json);
+    Object.assign(S, state.S);
+    Object.assign(M, state.M);
+    if (Array.isArray(M.paintTimings)) {
+      M.paintTimings = new Map(M.paintTimings as any);
+    }
+    syncMaskUI();
+    syncSettingsUI();
+  } catch {}
+}
+
+function syncSettingsUI() {
+  rampInput.value          = S.ramp;
+  renderModeSelect.value   = S.renderMode;
+  rampRow.style.display    = S.renderMode === 'ascii' ? 'flex' : 'none';
+  widthSlider.value        = String(S.widthChars);   widthVal.textContent       = String(S.widthChars);
+  cellAspectSlider.value   = String(S.cellAspect);   cellAspectVal.textContent  = S.cellAspect.toFixed(2);
+  edgeSlider.value         = String(S.edgeThreshold);edgeVal.textContent        = String(S.edgeThreshold);
+  gifCellSlider.value      = String(S.gifCell);      gifCellVal.textContent     = `${S.gifCell} px`;
+  blendStepsSlider.value   = String(S.blendSteps);   blendStepsVal.textContent  = String(S.blendSteps);
+  holdFramesSlider.value   = String(S.holdFrames);   holdFramesVal.textContent  = String(S.holdFrames);
+  maxFramesSlider.value    = String(S.maxFrames);    maxFramesVal.textContent   = String(S.maxFrames);
+  sampleFpsSlider.value    = String(S.sampleFps);    sampleFpsVal.textContent   = String(S.sampleFps);
+  scanlinesSlider.value    = String(S.scanlines);    scanlinesVal.textContent   = `${S.scanlines}%`;
+  vignetteSlider.value     = String(S.vignette);     vignetteVal.textContent    = `${S.vignette}%`;
+  grainSlider.value        = String(S.grain);        grainVal.textContent       = `${S.grain}%`;
+  glowSlider.value         = String(S.glow);         glowVal.textContent        = `${S.glow}%`;
+  themeFg.value            = S.themeFg;
+  themeBg.value            = S.themeBg;
+  themeRow.querySelectorAll<HTMLButtonElement>('.preset-chip').forEach(c => c.classList.toggle('active', c.dataset.theme === S.theme));
+  customThemeBox.style.display = S.theme === 'custom' ? 'block' : 'none';
+  colorToggle.classList.toggle('on',     S.color);
+  invertToggle.classList.toggle('on',    S.invert);
+  autoContrastTgl.classList.toggle('on', S.autoContrast);
+  edgeToggle.classList.toggle('on',      S.edgeOn);
+  smoothMergeTgl.classList.toggle('on',  S.smoothMerge);
+  reverseToggle.classList.toggle('on',   M.reverse);
+  edgeRow.style.display = S.edgeOn ? 'flex' : 'none';
+}
+
+// Load shared state on init
+loadFromHash();
+
+// Keyboard shortcuts
+window.addEventListener('keydown', e => {
+  // Skip when typing in inputs
+  const tag = (e.target as HTMLElement)?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  if (e.code === 'Space') {
+    e.preventDefault();
+    btnMaskPlay.click();
+  } else if (e.code === 'KeyR') {
+    btnMaskReset.click();
+  } else if (e.code === 'ArrowLeft') {
+    e.preventDefault();
+    const next = Math.max(0, parseInt(maskProgressSlider.value) - (e.shiftKey ? 1 : 5));
+    maskProgressSlider.value = String(next);
+    maskProgressSlider.dispatchEvent(new Event('input'));
+  } else if (e.code === 'ArrowRight') {
+    e.preventDefault();
+    const next = Math.min(100, parseInt(maskProgressSlider.value) + (e.shiftKey ? 1 : 5));
+    maskProgressSlider.value = String(next);
+    maskProgressSlider.dispatchEvent(new Event('input'));
+  } else if (e.code === 'KeyF') {
+    zoomFit.click();
+  }
+});
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+
+const DEFAULTS = { ...S };
+
+btnReset.addEventListener('click', () => {
+  Object.assign(S, DEFAULTS);
+
+  rampInput.value = S.ramp;
+
+  widthSlider.value      = String(S.widthChars);   widthVal.textContent      = String(S.widthChars);
+  cellAspectSlider.value = String(S.cellAspect);   cellAspectVal.textContent = S.cellAspect.toFixed(2);
+  edgeSlider.value       = String(S.edgeThreshold);edgeVal.textContent       = String(S.edgeThreshold);
+  gifCellSlider.value    = String(S.gifCell);      gifCellVal.textContent    = `${S.gifCell} px`;
+  blendStepsSlider.value = String(S.blendSteps);   blendStepsVal.textContent = String(S.blendSteps);
+  holdFramesSlider.value = String(S.holdFrames);   holdFramesVal.textContent = String(S.holdFrames);
+  maxFramesSlider.value  = String(S.maxFrames);    maxFramesVal.textContent  = String(S.maxFrames);
+  sampleFpsSlider.value  = String(S.sampleFps);    sampleFpsVal.textContent  = String(S.sampleFps);
+
+  colorToggle.classList.toggle('on',     S.color);
+  invertToggle.classList.toggle('on',    S.invert);
+  autoContrastTgl.classList.toggle('on', S.autoContrast);
+  edgeToggle.classList.toggle('on',      S.edgeOn);
+  smoothMergeTgl.classList.toggle('on',  S.smoothMerge);
+  edgeRow.style.display = S.edgeOn ? 'flex' : 'none';
+
+  onSettingsChange();
+});
+
+// ── File loading ──────────────────────────────────────────────────────────────
+
+function classify(file: File): SourceKind {
+  if (file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif')) return 'gif';
+  if (file.type.startsWith('video/')) return 'video';
+  return 'image';
+}
+
+async function reloadFile() {
+  if (lastFile) await loadFile(lastFile);
+}
+
+async function loadFile(file: File) {
+  stopAnim();
+  stopMask();
+  setStatus('Loading…');
+  rawFrames = []; asciiFrames = [];
+  emptyState.style.display = 'none';
+  lastFile = file;
+
+  try {
+    currentKind = classify(file);
+
+    if (currentKind === 'image') {
+      rawFrames = [await decodeImageFile(file)];
+      rawDelays = [100];
+    } else if (currentKind === 'gif') {
+      const r = await decodeGifFile(file, S.maxFrames);
+      rawFrames = r.frames; rawDelays = r.delays;
+    } else {
+      rawFrames = await decodeVideoFile(file, { maxFrames: S.maxFrames, sampleFps: S.sampleFps });
+      rawDelays = rawFrames.map(() => Math.round(100 / S.sampleFps));
+    }
+
+    if (!rawFrames.length) throw new Error('No frames decoded');
+
+    // Thumbnail
+    const tmp = document.createElement('canvas');
+    tmp.width = rawFrames[0].width; tmp.height = rawFrames[0].height;
+    tmp.getContext('2d')!.putImageData(rawFrames[0], 0, 0);
+    thumbImg.src = tmp.toDataURL();
+    thumbImg.style.display = 'block';
+    dropFileName.textContent = file.name;
+    dropFileName.style.display = 'block';
+
+    const isAnim = rawFrames.length > 1;
+    animSection.style.display    = isAnim ? 'block' : 'none';
+    scrubber.style.display       = isAnim ? 'flex'  : 'none';
+    smoothMergeRow.style.display = isAnim ? 'flex'  : 'none';
+    frameSlider.max   = String(rawFrames.length - 1);
+    frameSlider.value = '0';
+    currentFrame      = 0;
+
+    await buildAscii();
+
+    if (isAnim) startAnim();
+    // Re-render mask at current progress if scrubber was already set
+    if (M.progress > 0) renderAtProgress(M.progress);
+  } catch (err) {
+    setStatus((err as Error).message || 'Load failed', 'err');
+  }
+}
+
+// ── ASCII conversion ──────────────────────────────────────────────────────────
+
+// ── Custom render modes ───────────────────────────────────────────────────────
+
+// Density-ordered (densest first → sparsest → space)
+const HALFTONE_RAMP  = '⬤●⬭◍○∘·  ';   // size-graduated dots
+const BLOCK_RAMP     = '█▓▒░ ';
+const GEOMETRIC_RAMP = '●◉◎○◌⋅ ';
+const BAYER_4 = [
+  [ 0,  8,  2, 10],
+  [12,  4, 14,  6],
+  [ 3, 11,  1,  9],
+  [15,  7, 13,  5],
+];
+
+function resampleToImageData(img: ImageData, w: number, h: number): ImageData {
+  const src = document.createElement('canvas');
+  src.width = img.width; src.height = img.height;
+  src.getContext('2d')!.putImageData(img, 0, 0);
+  const dst = document.createElement('canvas');
+  dst.width = w; dst.height = h;
+  const dc = dst.getContext('2d')!;
+  (dc as any).imageSmoothingEnabled = true;
+  (dc as any).imageSmoothingQuality = 'high';
+  dc.drawImage(src, 0, 0, w, h);
+  return dc.getImageData(0, 0, w, h);
+}
+
+function imageDataToBraille(img: ImageData, widthChars: number, invert: boolean, autoContrast: boolean): AsciiResult {
+  // Aspect: each braille char represents 2 pixel-cols × 4 pixel-rows.
+  // Visually a typical font cell is ~ 0.5 wide:tall, so a braille char displays ~2:4 dots
+  // in a 0.5:1 cell — meaning each "dot row" is ~0.25 cell tall, each "dot col" ~0.25 cell wide.
+  // For natural image aspect: heightChars ≈ imageAspect × widthChars (with cellAspect baked in).
+  const aspect = img.height / img.width;
+  const heightChars = Math.max(1, Math.round(aspect * widthChars));
+  const sw = widthChars * 2;
+  const sh = heightChars * 4;
+  const sampled = resampleToImageData(img, sw, sh);
+  const d = sampled.data;
+
+  // Find threshold via simple mean luminance for autoContrast
+  let lumSum = 0;
+  if (autoContrast) {
+    for (let i = 0; i < d.length; i += 4) {
+      lumSum += (d[i] * 0.2126 + d[i+1] * 0.7152 + d[i+2] * 0.0722) / 255;
+    }
+  }
+  const threshold = autoContrast ? lumSum / (d.length / 4) : 0.5;
+
+  // Map (col, row) within the 2×4 sub-grid → braille bit
+  const dotMap: Array<[number, number, number]> = [
+    [0, 0, 1 << 0], // dot 1
+    [0, 1, 1 << 1], // dot 2
+    [0, 2, 1 << 2], // dot 3
+    [1, 0, 1 << 3], // dot 4
+    [1, 1, 1 << 4], // dot 5
+    [1, 2, 1 << 5], // dot 6
+    [0, 3, 1 << 6], // dot 7
+    [1, 3, 1 << 7], // dot 8
+  ];
+
+  let text = '';
+  const colors = new Uint8Array(widthChars * heightChars * 3);
+
+  for (let cy = 0; cy < heightChars; cy++) {
+    for (let cx = 0; cx < widthChars; cx++) {
+      let bits = 0;
+      let r = 0, g = 0, b = 0, count = 0;
+      for (const [dx, dy, mask] of dotMap) {
+        const sx = cx * 2 + dx;
+        const sy = cy * 4 + dy;
+        const idx = (sy * sw + sx) * 4;
+        const lum = (d[idx] * 0.2126 + d[idx+1] * 0.7152 + d[idx+2] * 0.0722) / 255;
+        const filled = invert ? lum < threshold : lum >= threshold;
+        if (filled) bits |= mask;
+        r += d[idx]; g += d[idx+1]; b += d[idx+2]; count++;
+      }
+      text += String.fromCharCode(0x2800 + bits);
+      const o = (cy * widthChars + cx) * 3;
+      colors[o]   = Math.round(r / count);
+      colors[o+1] = Math.round(g / count);
+      colors[o+2] = Math.round(b / count);
+    }
+    if (cy < heightChars - 1) text += '\n';
+  }
+
+  return { text, columns: widthChars, rows: heightChars, colors };
+}
+
+function imageDataToBayer(img: ImageData, widthChars: number, invert: boolean, cellAspect: number): AsciiResult {
+  const aspect = img.height / img.width;
+  const heightChars = Math.max(1, Math.round(aspect * widthChars * 0.5 * cellAspect));
+  const sampled = resampleToImageData(img, widthChars, heightChars);
+  const d = sampled.data;
+
+  let text = '';
+  const colors = new Uint8Array(widthChars * heightChars * 3);
+
+  for (let y = 0; y < heightChars; y++) {
+    for (let x = 0; x < widthChars; x++) {
+      const idx = (y * widthChars + x) * 4;
+      let lum = (d[idx] * 0.2126 + d[idx+1] * 0.7152 + d[idx+2] * 0.0722) / 255;
+      if (invert) lum = 1 - lum;
+      const thresh = (BAYER_4[y % 4][x % 4] + 0.5) / 16;
+      text += lum > thresh ? '█' : ' ';
+      const o = (y * widthChars + x) * 3;
+      colors[o]   = d[idx];
+      colors[o+1] = d[idx+1];
+      colors[o+2] = d[idx+2];
+    }
+    if (y < heightChars - 1) text += '\n';
+  }
+
+  return { text, columns: widthChars, rows: heightChars, colors };
+}
+
+function rampForMode(): string {
+  switch (S.renderMode) {
+    case 'halftone':  return HALFTONE_RAMP;
+    case 'block':     return BLOCK_RAMP;
+    case 'geometric': return GEOMETRIC_RAMP;
+    default:          return S.ramp;
+  }
+}
+
+async function buildAscii() {
+  if (!rawFrames.length) return;
+  setStatus('Converting…');
+
+  if (S.renderMode === 'braille') {
+    asciiFrames = rawFrames.map(f => imageDataToBraille(f, S.widthChars, S.invert, S.autoContrast));
+  } else if (S.renderMode === 'bayer') {
+    asciiFrames = rawFrames.map(f => imageDataToBayer(f, S.widthChars, S.invert, S.cellAspect));
+  } else {
+    const ramp = rampForMode();
+    asciiFrames = rawFrames.map(f =>
+      imageDataToAscii(f, {
+        widthChars:    S.widthChars,
+        ramp,
+        invert:        S.invert,
+        autoContrast:  S.autoContrast,
+        edgeThreshold: S.edgeOn ? S.edgeThreshold : null,
+        cellAspect:    S.cellAspect,
+        color:         S.color,
+      }),
+    );
+  }
+
+  if (M.progress > 0) renderAtProgress(M.progress);
+  else renderFrame(currentFrame);
+  [btnPng, btnSvg, btnTxt, btnHtml, btnMd, btnAnsi].forEach(b => b.disabled = false);
+  btnGif.disabled = asciiFrames.length < 2;
+
+  const f0 = asciiFrames[0];
+  infoLabel.textContent =
+    `${rawFrames.length} frame${rawFrames.length > 1 ? 's' : ''} · ` +
+    `${f0.columns}×${f0.rows} chars · ` +
+    `${rawFrames[0].width}×${rawFrames[0].height} px`;
+  setStatus(`✓ Ready — ${rawFrames.length} frame${rawFrames.length > 1 ? 's' : ''}`, 'ok');
+}
+
+function onSettingsChange() { buildAscii(); }
+
+// ── Canvas rendering ──────────────────────────────────────────────────────────
+
+// ── Theme palette ─────────────────────────────────────────────────────────────
+
+type Palette = { bg: string; fgFn: (r:number,g:number,b:number)=>string; };
+function getPalette(): Palette {
+  switch (S.theme) {
+    case 'matrix':
+      return {
+        bg: '#001100',
+        fgFn: (r,g,b) => {
+          const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+          const v = Math.round(60 + 195 * lum);
+          return `rgb(0,${v},${Math.round(v * 0.4)})`;
+        },
+      };
+    case 'amber':
+      return {
+        bg: '#1a0a00',
+        fgFn: (r,g,b) => {
+          const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+          const v = Math.round(50 + 205 * lum);
+          return `rgb(${v},${Math.round(v * 0.65)},${Math.round(v * 0.05)})`;
+        },
+      };
+    case 'cyber':
+      return {
+        bg: '#0a001f',
+        fgFn: (r,g,b) => {
+          const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+          // Duotone: dark = magenta, bright = cyan
+          if (lum < 0.5) {
+            const v = lum * 2; // 0-1
+            return `rgb(${Math.round(255 * v + 100 * (1 - v))},0,${Math.round(255 * v + 100 * (1 - v))})`;
+          } else {
+            const v = (lum - 0.5) * 2;
+            return `rgb(${Math.round(0 + 255 * (1-v))},${Math.round(255 * v)},${Math.round(255)})`;
+          }
+        },
+      };
+    case 'mono':
+      return {
+        bg: '#000000',
+        fgFn: (r,g,b) => {
+          const lum = Math.round((r * 0.2126 + g * 0.7152 + b * 0.0722));
+          return `rgb(${lum},${lum},${lum})`;
+        },
+      };
+    case 'sepia':
+      return {
+        bg: '#1f140a',
+        fgFn: (r,g,b) => {
+          const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+          const v = Math.round(60 + 195 * lum);
+          return `rgb(${v},${Math.round(v * 0.75)},${Math.round(v * 0.45)})`;
+        },
+      };
+    case 'custom': {
+      const [fr, fg, fb] = hexToRgb(S.themeFg);
+      return {
+        bg: S.themeBg,
+        fgFn: (r,g,b) => {
+          const lum = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 255;
+          return `rgb(${Math.round(fr * lum)},${Math.round(fg * lum)},${Math.round(fb * lum)})`;
+        },
+      };
+    }
+    default: // auto — image colors
+      return {
+        bg: '#0a0a0c',
+        fgFn: (r,g,b) => `rgb(${r},${g},${b})`,
+      };
+  }
+}
+
+// ── Overlay (scanlines / vignette / grain / glow) ─────────────────────────────
+
+function drawOverlay(c: CanvasRenderingContext2D, w: number, h: number) {
+  // Scanlines
+  if (S.scanlines > 0) {
+    c.save();
+    c.globalAlpha = S.scanlines * 0.005; // 0–0.5
+    c.fillStyle = '#000';
+    for (let y = 0; y < h; y += 2) c.fillRect(0, y, w, 1);
+    c.restore();
+  }
+  // Grain
+  if (S.grain > 0) {
+    const a = S.grain * 0.012;
+    const id = c.getImageData(0, 0, w, h);
+    const d  = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const n = (Math.random() - 0.5) * 255 * a;
+      d[i]   = Math.max(0, Math.min(255, d[i]   + n));
+      d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
+      d[i+2] = Math.max(0, Math.min(255, d[i+2] + n));
+    }
+    c.putImageData(id, 0, 0);
+  }
+  // Vignette
+  if (S.vignette > 0) {
+    c.save();
+    const grad = c.createRadialGradient(w/2, h/2, Math.min(w, h) * 0.3, w/2, h/2, Math.max(w, h) * 0.7);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, `rgba(0,0,0,${S.vignette * 0.012})`);
+    c.fillStyle = grad;
+    c.fillRect(0, 0, w, h);
+    c.restore();
+  }
+  // Glow (additive blur — applied via shadow)
+  if (S.glow > 0) {
+    // Lift overall brightness with an additive layer
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    c.fillStyle = `rgba(80,140,255,${S.glow * 0.003})`;
+    c.fillRect(0, 0, w, h);
+    c.restore();
+  }
+}
+
+function setCanvasSize(c: HTMLCanvasElement, c2: CanvasRenderingContext2D, cssW: number, cssH: number) {
+  c.width  = Math.round(cssW * DPR);
+  c.height = Math.round(cssH * DPR);
+  c.style.width  = `${cssW}px`;
+  c.style.height = `${cssH}px`;
+  c2.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+function renderFrame(fi: number) {
+  if (!asciiFrames.length) return;
+  const frame = asciiFrames[Math.min(fi, asciiFrames.length - 1)];
+  if (!frame) return;
+
+  const lines = frame.text.split('\n');
+  const rows  = lines.length;
+  const cols  = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const cw    = cols * CELL;
+  const ch    = rows * CELL;
+
+  setCanvasSize(canvasEl, ctx, cw, ch);
+  const pal = getPalette();
+  ctx.fillStyle = pal.bg;
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.font = `${CELL}px 'SF Mono','Menlo','Consolas',monospace`;
+  ctx.textBaseline = 'top';
+  ctx.textRendering = 'geometricPrecision' as any;
+  (ctx as any).imageSmoothingEnabled = true;
+
+  for (let row = 0; row < rows; row++) {
+    const line = lines[row];
+    for (let col = 0; col < line.length; col++) {
+      const glyph = line[col];
+      if (glyph === ' ') continue;
+      if (frame.colors) {
+        const o = (row * frame.columns + col) * 3;
+        ctx.fillStyle = pal.fgFn(frame.colors[o], frame.colors[o+1], frame.colors[o+2]);
+      } else {
+        ctx.fillStyle = pal.fgFn(230, 230, 230);
+      }
+      ctx.fillText(glyph, col * CELL, row * CELL);
+    }
+  }
+
+  drawOverlay(ctx, cw, ch);
+  applyZoom(zoomPct);
+  frameLabel.textContent = `${fi + 1} / ${asciiFrames.length}`;
+  frameSlider.value = String(fi);
+  syncCompare();
+}
+
+// ── Regular animation playback ────────────────────────────────────────────────
+
+function startAnim() {
+  if (playing || asciiFrames.length < 2) return;
+  playing = true;
+  playBtn.textContent = '⏸';
+  tick();
+}
+
+function stopAnim() {
+  playing = false;
+  if (animTimer !== null) { clearTimeout(animTimer); animTimer = null; }
+  playBtn.textContent = '▶';
+}
+
+function tick() {
+  if (!playing || !asciiFrames.length) return;
+  renderFrame(currentFrame);
+  const delay = (rawDelays[currentFrame] ?? 10) * 10;
+  currentFrame = (currentFrame + 1) % asciiFrames.length;
+  animTimer = setTimeout(tick, delay) as unknown as number;
+}
+
+playBtn.addEventListener('click', () => {
+  if (M.active) return; // mask owns the canvas
+  if (playing) stopAnim(); else startAnim();
+});
+
+frameSlider.addEventListener('input', () => {
+  if (M.active) return;
+  stopAnim();
+  currentFrame = parseInt(frameSlider.value);
+  renderFrame(currentFrame);
+});
+
+// ── Mask reveal — scrubber-driven, cell-based ────────────────────────────────
+
+// Deterministic noise: stable per position
+function noise(seed: number) {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// Per-cell normalized position along the chosen direction (0=enters first, 1=enters last)
+function cellPosition(row: number, col: number, rows: number, cols: number, dir: Direction): number {
+  const Rmax = Math.max(1, rows - 1);
+  const Cmax = Math.max(1, cols - 1);
+
+  // Custom origin override (for radial directions)
+  const origin = M.origin;
+  const cx = origin ? origin.col : Cmax / 2;
+  const cy = origin ? origin.row : Rmax / 2;
+  // Max distance from origin to any corner
+  const maxDist = Math.max(
+    Math.hypot(cx, cy),
+    Math.hypot(Cmax - cx, cy),
+    Math.hypot(cx, Rmax - cy),
+    Math.hypot(Cmax - cx, Rmax - cy),
+  );
+
+  switch (dir) {
+    case 'lr':         return col / Cmax;
+    case 'rl':         return (Cmax - col) / Cmax;
+    case 'tb':         return row / Rmax;
+    case 'bt':         return (Rmax - row) / Rmax;
+    case 'tl-br':      return (col + row) / (Cmax + Rmax);
+    case 'tr-bl':      return ((Cmax - col) + row) / (Cmax + Rmax);
+    case 'bl-tr':      return (col + (Rmax - row)) / (Cmax + Rmax);
+    case 'br-tl':      return ((Cmax - col) + (Rmax - row)) / (Cmax + Rmax);
+    case 'radial-out': return Math.hypot(col - cx, row - cy) / Math.max(0.001, maxDist);
+    case 'radial-in':  return 1 - Math.hypot(col - cx, row - cy) / Math.max(0.001, maxDist);
+    case 'random':     return noise(row * 31.7 + col * 17.3 + 5.1);
+    case 'diag-stripes': {
+      const stripeIdx = Math.floor((col + row) / 4);
+      return (stripeIdx % 8) / 8 + ((col + row) % 4) / 32;
+    }
+    case 'multi-front': {
+      // Two fronts: from L and R, meeting at center
+      const fromL = col / Cmax;
+      const fromR = (Cmax - col) / Cmax;
+      return Math.min(fromL, fromR) * 2; // 0 at edges, ~1 at center
+    }
+    case 'paint': {
+      if (!M.paintTimings || M.paintCount === 0) return 0;
+      const k = row * cols + col;
+      const t = M.paintTimings.get(k);
+      return t === undefined ? 0 : t / Math.max(1, M.paintCount - 1);
+    }
+  }
+}
+
+function applyEasing(p: number, e: Easing): number {
+  p = Math.max(0, Math.min(1, p));
+  switch (e) {
+    case 'in':     return p * p;
+    case 'out':    return 1 - (1 - p) * (1 - p);
+    case 'in-out': return p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+    case 'step':   return Math.floor(p * 8) / 8;
+    case 'exp':    return p === 0 ? 0 : Math.pow(2, 10 * p - 10);
+    default:       return p;
+  }
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+// Render the mask at a given progress (0 = initial state, 1 = final state)
+// Reverse mode flips the meaning so: 0 = visible, 1 = hidden
+function renderAtProgress(p: number) {
+  const frame = asciiFrames[currentFrame] || asciiFrames[0];
+  if (!frame) return;
+
+  // Effective progress for rendering — reverse swaps the endpoints
+  const effP = M.reverse ? (1 - p) : p;
+
+  if (effP <= 0) {
+    // Blank canvas (or "fully hidden" in normal mode = blank, "fully revealed" in reverse = the frame)
+    const cols = frame.text.split('\n').reduce((m, l) => Math.max(m, l.length), 0);
+    const rows = frame.text.split('\n').length;
+    setCanvasSize(canvasEl, ctx, cols * CELL, rows * CELL);
+    const pal = getPalette();
+    ctx.fillStyle = pal.bg;
+    ctx.fillRect(0, 0, cols * CELL, rows * CELL);
+    drawOverlay(ctx, cols * CELL, rows * CELL);
+    applyZoom(zoomPct);
+    return;
+  }
+  if (effP >= 1) { renderFrame(currentFrame); return; }
+
+  const totalTime = M.duration + M.flipDuration;
+  renderMaskFrame(effP * totalTime, frame);
+}
+
+// Play animation: advance progress from maskPlayFrom → 1
+function maskPlayTick(now: number) {
+  if (maskPlayStart === null) return;
+  const elapsed       = (now - maskPlayStart) / 1000;
+  const totalTime     = M.duration + M.flipDuration;
+  const remainingTime = (1 - maskPlayFrom) * totalTime;
+  const p             = Math.min(1, maskPlayFrom + elapsed / Math.max(0.01, remainingTime));
+
+  M.progress = p;
+  maskProgressSlider.value    = String(Math.round(p * 100));
+  maskProgressVal.textContent = `${Math.round(p * 100)}%`;
+  renderAtProgress(p);
+
+  if (p < 1) maskRaf = requestAnimationFrame(maskPlayTick);
+  else       stopMaskPlay();
+}
+
+function stopMaskPlay() {
+  if (maskRaf !== null) { cancelAnimationFrame(maskRaf); maskRaf = null; }
+  maskPlayStart = null;
+  btnMaskPlay.textContent = '▶ Play';
+}
+
+function stopMask() { stopMaskPlay(); }
+
+function renderMaskFrame(t: number, frame: AsciiResult) {
+  const lines = frame.text.split('\n');
+  const rows  = lines.length;
+  const cols  = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const cw    = cols * CELL;
+  const ch    = rows * CELL;
+
+  setCanvasSize(canvasEl, ctx, cw, ch);
+  const pal = getPalette();
+
+  ctx.fillStyle = pal.bg;
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.font = `${CELL}px 'SF Mono','Menlo','Consolas',monospace`;
+  ctx.textBaseline = 'top';
+  ctx.textRendering = 'geometricPrecision' as any;
+
+  const charset       = M.flipCharset || '*+=-_.';
+  const jitterPhase   = Math.floor(t * 15);
+  const totalRevealT  = M.duration; // last cell's tEnter at progress=1
+  const flipPhase     = Math.floor(t * M.flipRate);
+
+  // Distortion factors (0–0.5 max shift in normalized cellPos)
+  const waveAmt   = M.waveAmount * 0.01; // 0..0.5
+  const noiseAmt  = M.edgeNoise  * 0.01;
+  const waveFreq  = Math.max(1, M.waveFreq);
+
+  const [mr, mg, mb] = hexToRgb(M.monoColor);
+
+  for (let row = 0; row < rows; row++) {
+    const line = lines[row];
+    for (let col = 0; col < line.length; col++) {
+      const finalGlyph = line[col];
+      if (finalGlyph === ' ') continue;
+
+      // 1) Base position along the chosen direction
+      let cp = cellPosition(row, col, rows, cols, M.direction);
+
+      // 2) Wave: sinusoidal shift along perpendicular axis (looks wavy)
+      if (waveAmt > 0) {
+        // Pick perpendicular based on direction family
+        let perpVal: number;
+        switch (M.direction) {
+          case 'lr': case 'rl':                       perpVal = row; break;
+          case 'tb': case 'bt':                       perpVal = col; break;
+          case 'tl-br': case 'br-tl':                 perpVal = col - row; break;
+          case 'tr-bl': case 'bl-tr':                 perpVal = col + row; break;
+          case 'radial-out': case 'radial-in':        perpVal = Math.atan2(row - rows / 2, col - cols / 2) * waveFreq; break;
+          default:                                    perpVal = row + col; break;
+        }
+        cp += Math.sin((perpVal / waveFreq) * Math.PI * 2) * waveAmt;
+      }
+
+      // 3) Edge noise: random per-cell offset
+      if (noiseAmt > 0) {
+        cp += (noise(row * 13.7 + col * 7.3) - 0.5) * 2 * noiseAmt;
+      }
+
+      cp = Math.max(0, Math.min(1, cp));
+
+      // 4) Easing
+      const easedCp = applyEasing(cp, M.easing);
+
+      // 5) Cell timing
+      const tEnter  = easedCp * totalRevealT;
+      const tSettle = tEnter + M.flipDuration;
+
+      if (t < tEnter) continue;
+
+      const settled  = t >= tSettle;
+      const progress = settled ? 1 : (t - tEnter) / Math.max(0.001, M.flipDuration);
+
+      // 6) Glyph
+      const flipIdx  = Math.abs(flipPhase + col * 7 + row * 3) % charset.length;
+      let   glyph    = settled ? finalGlyph : charset[flipIdx];
+      let   drawRow  = row;
+
+      if (!settled && M.vertJitter > 0) {
+        const jit = Math.round(
+          (noise(row * 37 + col * 13 + jitterPhase) - 0.5) * 2 * M.vertJitter * (1 - progress),
+        );
+        drawRow = Math.max(0, Math.min(rows - 1, row + jit));
+      }
+
+      // 7) Colour — apply theme palette to source colour
+      const sr = frame.colors ? frame.colors[(row * frame.columns + col) * 3]     : 230;
+      const sg = frame.colors ? frame.colors[(row * frame.columns + col) * 3 + 1] : 230;
+      const sb = frame.colors ? frame.colors[(row * frame.columns + col) * 3 + 2] : 230;
+      // Get themed final colour as RGB tuple
+      const themedStyle = pal.fgFn(sr, sg, sb);
+      const m = themedStyle.match(/rgb\((\d+),(\d+),(\d+)\)/);
+      const fr = m ? parseInt(m[1]) : sr;
+      const fg = m ? parseInt(m[2]) : sg;
+      const fb = m ? parseInt(m[3]) : sb;
+
+      let style: string;
+      if (settled) {
+        style = themedStyle;
+      } else {
+        switch (M.colorMode) {
+          case 'fade-grey': {
+            const r = Math.round(fr * progress + 160 * (1 - progress));
+            const g = Math.round(fg * progress + 160 * (1 - progress));
+            const b = Math.round(fb * progress + 160 * (1 - progress));
+            style = `rgb(${r},${g},${b})`;
+            break;
+          }
+          case 'glitch': {
+            const seed = row * 13 + col * 7 + flipPhase;
+            const gr   = Math.floor(noise(seed) * 255);
+            const gg   = Math.floor(noise(seed + 1.5) * 255);
+            const gb   = Math.floor(noise(seed + 2.7) * 255);
+            style = `rgb(${gr},${gg},${gb})`;
+            break;
+          }
+          case 'mono': {
+            const r = Math.round(fr * progress + mr * (1 - progress));
+            const g = Math.round(fg * progress + mg * (1 - progress));
+            const b = Math.round(fb * progress + mb * (1 - progress));
+            style = `rgb(${r},${g},${b})`;
+            break;
+          }
+          case 'opacity':
+            style = `rgba(${fr},${fg},${fb},${(0.25 + 0.75 * progress).toFixed(2)})`;
+            break;
+          case 'invert':
+            style = `rgb(${255 - fr},${255 - fg},${255 - fb})`;
+            break;
+          default:
+            style = `rgb(${fr},${fg},${fb})`;
+        }
+      }
+      ctx.fillStyle = style;
+      ctx.fillText(glyph, col * CELL, drawRow * CELL);
+    }
+  }
+
+  drawOverlay(ctx, cw, ch);
+  applyZoom(zoomPct);
+}
+
+// ── Zoom ──────────────────────────────────────────────────────────────────────
+
+function applyZoom(pct: number) {
+  zoomPct = pct;
+  const scale = pct / 100;
+  // Logical (CSS) size is canvas.width / DPR
+  const logW = canvasEl.width  / DPR;
+  const logH = canvasEl.height / DPR;
+  canvasEl.style.width  = `${logW * scale}px`;
+  canvasEl.style.height = `${logH * scale}px`;
+  zoomLabel.textContent = `${pct}%`;
+  positionOriginMarker();
+}
+
+zoomIn.addEventListener('click',  () => applyZoom(Math.min(400, zoomPct + 25)));
+zoomOut.addEventListener('click', () => applyZoom(Math.max(10,  zoomPct - 25)));
+zoomFit.addEventListener('click', () => {
+  if (!canvasEl.width) return;
+  const wrap = canvasWrap.getBoundingClientRect();
+  const logW = canvasEl.width  / DPR;
+  const logH = canvasEl.height / DPR;
+  const pct  = Math.floor(Math.min(
+    (wrap.width  - 48) / logW,
+    (wrap.height - 48) / logH,
+  ) * 100);
+  applyZoom(Math.max(10, Math.min(400, pct)));
+});
+
+// ── PNG export ────────────────────────────────────────────────────────────────
+
+btnPng.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  if (maskPlayStart === null && M.progress >= 1) renderFrame(currentFrame);
+  canvasEl.toBlob(blob => downloadBlob(blob!, 'ascii-art.png'), 'image/png');
+});
+
+// ── Text exports ──────────────────────────────────────────────────────────────
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function downloadText(text: string, filename: string, mime = 'text/plain') {
+  downloadBlob(new Blob([text], { type: mime }), filename);
+}
+
+btnTxt.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  downloadText(asciiFrames[currentFrame].text, 'ascii-art.txt');
+});
+
+btnMd.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const txt = '```\n' + asciiFrames[currentFrame].text + '\n```\n';
+  downloadText(txt, 'ascii-art.md', 'text/markdown');
+});
+
+btnHtml.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const f = asciiFrames[currentFrame];
+  const pal = getPalette();
+  const lines = f.text.split('\n');
+  let out = `<pre style="background:${pal.bg};font-family:'SF Mono','Menlo',monospace;font-size:10px;line-height:1;padding:16px;margin:0;">`;
+  for (let r = 0; r < lines.length; r++) {
+    const line = lines[r];
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      const safe = ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : ch;
+      if (ch === ' ') { out += safe; continue; }
+      let style = 'color:#e6e6e6';
+      if (f.colors) {
+        const o = (r * f.columns + c) * 3;
+        style = `color:${pal.fgFn(f.colors[o], f.colors[o+1], f.colors[o+2])}`;
+      }
+      out += `<span style="${style}">${safe}</span>`;
+    }
+    out += '\n';
+  }
+  out += '</pre>';
+  downloadText(out, 'ascii-art.html', 'text/html');
+});
+
+btnSvg.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const f = asciiFrames[currentFrame];
+  const pal = getPalette();
+  const lines = f.text.split('\n');
+  const cw = f.columns * CELL;
+  const ch = lines.length * CELL;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}" viewBox="0 0 ${cw} ${ch}">`;
+  svg += `<rect width="${cw}" height="${ch}" fill="${pal.bg}"/>`;
+  svg += `<g font-family="SF Mono, Menlo, Consolas, monospace" font-size="${CELL}" dominant-baseline="hanging">`;
+  for (let r = 0; r < lines.length; r++) {
+    for (let c = 0; c < lines[r].length; c++) {
+      const ch2 = lines[r][c];
+      if (ch2 === ' ') continue;
+      const safe = ch2 === '<' ? '&lt;' : ch2 === '>' ? '&gt;' : ch2 === '&' ? '&amp;' : ch2;
+      let fill = '#e6e6e6';
+      if (f.colors) {
+        const o = (r * f.columns + c) * 3;
+        fill = pal.fgFn(f.colors[o], f.colors[o+1], f.colors[o+2]);
+      }
+      svg += `<text x="${c * CELL}" y="${r * CELL}" fill="${fill}">${safe}</text>`;
+    }
+  }
+  svg += `</g></svg>`;
+  downloadText(svg, 'ascii-art.svg', 'image/svg+xml');
+});
+
+btnAnsi.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const f = asciiFrames[currentFrame];
+  const lines = f.text.split('\n');
+  let out = '';
+  for (let r = 0; r < lines.length; r++) {
+    for (let c = 0; c < lines[r].length; c++) {
+      const ch = lines[r][c];
+      if (ch === ' ') { out += ' '; continue; }
+      if (f.colors) {
+        const o = (r * f.columns + c) * 3;
+        out += `\x1b[38;2;${f.colors[o]};${f.colors[o+1]};${f.colors[o+2]}m${ch}`;
+      } else out += ch;
+    }
+    out += '\x1b[0m\n';
+  }
+  out += '\x1b[0m';
+  downloadText(out, 'ascii-art.ansi');
+});
+
+// ── Mask reveal → GIF ─────────────────────────────────────────────────────────
+
+btnExportRevealGif.addEventListener('click', async () => {
+  if (!asciiFrames.length) return;
+  btnExportRevealGif.disabled = true;
+  btnExportRevealGif.textContent = '⏳ Encoding…';
+  setStatus('Baking reveal GIF…');
+  try {
+    await exportMaskRevealGif();
+    setStatus('✓ Reveal GIF saved!', 'ok');
+  } catch (err) {
+    setStatus((err as Error).message || 'Reveal GIF failed', 'err');
+  } finally {
+    btnExportRevealGif.disabled = false;
+    btnExportRevealGif.textContent = '▶ Export Reveal GIF';
+  }
+});
+
+async function exportMaskRevealGif() {
+  const frame = asciiFrames[currentFrame] || asciiFrames[0];
+  if (!frame) return;
+
+  const GC = S.gifCell;
+  const lines = frame.text.split('\n');
+  const cols = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const rows = lines.length;
+  const w = cols * GC;
+  const h = rows * GC;
+
+  const pal = getPalette();
+
+  // Off-screen canvas at GIF cell size
+  const off = document.createElement('canvas');
+  off.width = w; off.height = h;
+  const oc = off.getContext('2d', { willReadFrequently: true })!;
+  oc.font = `${GC}px 'SF Mono','Menlo',monospace`;
+  oc.textBaseline = 'top';
+  (oc as any).textRendering = 'geometricPrecision';
+
+  const FPS         = 24;
+  const totalTime   = M.duration + M.flipDuration;
+  const totalFrames = Math.max(2, Math.ceil(totalTime * FPS));
+  const HOLD_END    = 12; // ~0.5s hold on final
+  const charset     = M.flipCharset || '*+=-_.';
+  const [mr, mg, mb] = hexToRgb(M.monoColor);
+
+  // Render one mask frame to the off-screen canvas
+  function renderTo(t: number) {
+    oc.fillStyle = pal.bg;
+    oc.fillRect(0, 0, w, h);
+
+    const flipPhase  = Math.floor(t * M.flipRate);
+    const jitterPhase = Math.floor(t * 15);
+    const waveAmt    = M.waveAmount * 0.01;
+    const noiseAmt   = M.edgeNoise  * 0.01;
+    const waveFreq   = Math.max(1, M.waveFreq);
+
+    for (let row = 0; row < rows; row++) {
+      const line = lines[row];
+      for (let col = 0; col < line.length; col++) {
+        const finalGlyph = line[col];
+        if (finalGlyph === ' ') continue;
+
+        let cp = cellPosition(row, col, rows, cols, M.direction);
+        if (waveAmt > 0) {
+          let perp = row;
+          switch (M.direction) {
+            case 'tb': case 'bt': perp = col; break;
+            case 'tl-br': case 'br-tl': perp = col - row; break;
+            case 'tr-bl': case 'bl-tr': perp = col + row; break;
+            case 'radial-out': case 'radial-in': perp = Math.atan2(row - rows / 2, col - cols / 2) * waveFreq; break;
+          }
+          cp += Math.sin((perp / waveFreq) * Math.PI * 2) * waveAmt;
+        }
+        if (noiseAmt > 0) cp += (noise(row * 13.7 + col * 7.3) - 0.5) * 2 * noiseAmt;
+        cp = Math.max(0, Math.min(1, cp));
+        const easedCp = applyEasing(cp, M.easing);
+        const tEnter  = easedCp * M.duration;
+        const tSettle = tEnter + M.flipDuration;
+        if (t < tEnter) continue;
+
+        const settled  = t >= tSettle;
+        const progress = settled ? 1 : (t - tEnter) / Math.max(0.001, M.flipDuration);
+        const flipIdx  = Math.abs(flipPhase + col * 7 + row * 3) % charset.length;
+        let glyph    = settled ? finalGlyph : charset[flipIdx];
+        let drawRow  = row;
+
+        if (!settled && M.vertJitter > 0) {
+          const jit = Math.round((noise(row * 37 + col * 13 + jitterPhase) - 0.5) * 2 * M.vertJitter * (1 - progress));
+          drawRow = Math.max(0, Math.min(rows - 1, row + jit));
+        }
+
+        const sr = frame.colors ? frame.colors[(row * frame.columns + col) * 3]     : 230;
+        const sg = frame.colors ? frame.colors[(row * frame.columns + col) * 3 + 1] : 230;
+        const sb = frame.colors ? frame.colors[(row * frame.columns + col) * 3 + 2] : 230;
+        const themedStyle = pal.fgFn(sr, sg, sb);
+        const m = themedStyle.match(/rgb\((\d+),(\d+),(\d+)\)/);
+        const fr = m ? parseInt(m[1]) : sr;
+        const fg = m ? parseInt(m[2]) : sg;
+        const fb = m ? parseInt(m[3]) : sb;
+
+        let style: string;
+        if (settled) style = themedStyle;
+        else {
+          switch (M.colorMode) {
+            case 'fade-grey': style = `rgb(${Math.round(fr*progress+160*(1-progress))},${Math.round(fg*progress+160*(1-progress))},${Math.round(fb*progress+160*(1-progress))})`; break;
+            case 'glitch':    { const s2 = row*13+col*7+flipPhase; style = `rgb(${Math.floor(noise(s2)*255)},${Math.floor(noise(s2+1.5)*255)},${Math.floor(noise(s2+2.7)*255)})`; break; }
+            case 'mono':      style = `rgb(${Math.round(fr*progress+mr*(1-progress))},${Math.round(fg*progress+mg*(1-progress))},${Math.round(fb*progress+mb*(1-progress))})`; break;
+            case 'opacity':   style = `rgba(${fr},${fg},${fb},${(0.25 + 0.75 * progress).toFixed(2)})`; break;
+            case 'invert':    style = `rgb(${255-fr},${255-fg},${255-fb})`; break;
+            default:          style = themedStyle;
+          }
+        }
+        oc.fillStyle = style;
+        oc.fillText(glyph, col * GC, drawRow * GC);
+      }
+    }
+    drawOverlay(oc, w, h);
+  }
+
+  // Sample a mid-frame for global palette
+  renderTo(totalTime * 0.5);
+  const palData = new Uint8Array(oc.getImageData(0, 0, w, h).data.buffer);
+  const gpal = quantize(palData, 256);
+
+  const encoder = GIFEncoder({ repeat: 0 });
+  const frameDelay = Math.round(100 / FPS); // centiseconds
+
+  for (let i = 0; i < totalFrames; i++) {
+    const p = i / (totalFrames - 1);
+    const effP = M.reverse ? (1 - p) : p;
+    renderTo(effP * totalTime);
+    const data = new Uint8Array(oc.getImageData(0, 0, w, h).data.buffer);
+    encoder.writeFrame(applyPalette(data, gpal), w, h, { palette: gpal, delay: frameDelay });
+    if (i % 6 === 0) await new Promise(r => setTimeout(r, 0)); // yield
+  }
+
+  // Hold on final state
+  const finalP = M.reverse ? 0 : 1;
+  renderTo(finalP * totalTime);
+  const finalData = new Uint8Array(oc.getImageData(0, 0, w, h).data.buffer);
+  for (let i = 0; i < HOLD_END; i++) {
+    encoder.writeFrame(applyPalette(finalData, gpal), w, h, { palette: gpal, delay: frameDelay });
+  }
+
+  encoder.finish();
+  downloadBlob(new Blob([encoder.bytes()], { type: 'image/gif' }), 'ascii-reveal.gif');
+}
+
+// ── GIF export ────────────────────────────────────────────────────────────────
+
+btnGif.addEventListener('click', async () => {
+  if (asciiFrames.length < 2) return;
+  btnGif.disabled = true;
+  btnGif.textContent = 'Encoding…';
+  setStatus('Encoding GIF…');
+  try {
+    await exportGif();
+    setStatus('✓ GIF saved!', 'ok');
+  } catch (err) {
+    setStatus((err as Error).message || 'GIF failed', 'err');
+  } finally {
+    btnGif.disabled = false;
+    btnGif.textContent = 'Export GIF';
+  }
+});
+
+async function exportGif() {
+  const GC = S.gifCell;
+  const f0 = asciiFrames[0];
+  const w  = f0.columns * GC;
+  const h  = f0.rows    * GC;
+
+  const asc = document.createElement('canvas');
+  asc.width = w; asc.height = h;
+  const ac = asc.getContext('2d', { willReadFrequently: true })!;
+  ac.font = `${GC}px 'SF Mono','Menlo',monospace`;
+  ac.textBaseline = 'top';
+
+  let orig: HTMLCanvasElement | null = null;
+  if (S.smoothMerge && rawFrames.length > 0) {
+    const tmp = document.createElement('canvas');
+    tmp.width = rawFrames[0].width; tmp.height = rawFrames[0].height;
+    tmp.getContext('2d')!.putImageData(rawFrames[0], 0, 0);
+    orig = document.createElement('canvas');
+    orig.width = w; orig.height = h;
+    const oc = orig.getContext('2d')!;
+    oc.fillStyle = '#0a0a0c'; oc.fillRect(0, 0, w, h);
+    oc.drawImage(tmp, 0, 0, w, h);
+  }
+
+  const blend = document.createElement('canvas');
+  blend.width = w; blend.height = h;
+  const bc = blend.getContext('2d', { willReadFrequently: true })!;
+
+  const encoder = GIFEncoder({ repeat: 0 });
+
+  function drawAscii(frame: AsciiResult) {
+    ac.fillStyle = '#0a0a0c'; ac.fillRect(0, 0, w, h);
+    const lines = frame.text.split('\n');
+    for (let r = 0; r < lines.length; r++) {
+      for (let c = 0; c < lines[r].length; c++) {
+        const ch = lines[r][c]; if (ch === ' ') continue;
+        ac.fillStyle = frame.colors
+          ? `rgb(${frame.colors[(r * frame.columns + c) * 3]},${frame.colors[(r * frame.columns + c) * 3 + 1]},${frame.colors[(r * frame.columns + c) * 3 + 2]})`
+          : '#e6e6e6';
+        ac.fillText(ch, c * GC, r * GC);
+      }
+    }
+  }
+
+  function rgba(src: HTMLCanvasElement) {
+    return new Uint8Array(src.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, w, h).data.buffer);
+  }
+
+  if (orig) {
+    drawAscii(asciiFrames[0]);
+    bc.clearRect(0, 0, w, h);
+    bc.globalAlpha = 1;   bc.drawImage(asc,  0, 0);
+    bc.globalAlpha = 0.5; bc.drawImage(orig, 0, 0);
+    bc.globalAlpha = 1;
+    const gpal = quantize(rgba(blend), 256);
+
+    const enc = (src: HTMLCanvasElement, delay: number) => {
+      const r = rgba(src);
+      encoder.writeFrame(applyPalette(r, gpal), w, h, { palette: gpal, delay });
+    };
+
+    const STEPS = S.blendSteps, HOLD = S.holdFrames, DELAY = rawDelays[0] ?? 10;
+    let fi = 0;
+    for (let i = 0; i < HOLD; i++)           { enc(orig, 10); fi++; }
+    for (let i = STEPS; i >= 1; i--) {
+      drawAscii(asciiFrames[fi % asciiFrames.length]);
+      bc.clearRect(0, 0, w, h);
+      bc.globalAlpha = 1; bc.drawImage(asc, 0, 0);
+      bc.globalAlpha = i / STEPS; bc.drawImage(orig, 0, 0); bc.globalAlpha = 1;
+      enc(blend, DELAY); fi++;
+    }
+    for (let i = 0; i < asciiFrames.length; i++) {
+      drawAscii(asciiFrames[fi % asciiFrames.length]);
+      enc(asc, rawDelays[fi % asciiFrames.length] ?? 10); fi++;
+    }
+    for (let i = 1; i <= STEPS; i++) {
+      drawAscii(asciiFrames[fi % asciiFrames.length]);
+      bc.clearRect(0, 0, w, h);
+      bc.globalAlpha = 1; bc.drawImage(asc, 0, 0);
+      bc.globalAlpha = i / STEPS; bc.drawImage(orig, 0, 0); bc.globalAlpha = 1;
+      enc(blend, DELAY); fi++;
+    }
+  } else {
+    for (let fi = 0; fi < asciiFrames.length; fi++) {
+      drawAscii(asciiFrames[fi]);
+      const r = rgba(asc), p = quantize(r, 256);
+      encoder.writeFrame(applyPalette(r, p), w, h, { palette: p, delay: rawDelays[fi] ?? 10 });
+    }
+  }
+
+  encoder.finish();
+  const blob = new Blob([encoder.bytes()], { type: 'image/gif' });
+  const url  = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'ascii-animation.gif';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── File drop ─────────────────────────────────────────────────────────────────
+
+dropZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => { const f = fileInput.files?.[0]; if (f) loadFile(f); });
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  const f = e.dataTransfer?.files?.[0]; if (f) loadFile(f);
+});
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer?.files?.[0]; if (f) loadFile(f);
+});

@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ASCII Studio</title>
+  <style>
+    :root {
+      --bg:       #08080b;
+      --sidebar:  #0f0f14;
+      --panel:    #16161e;
+      --panel-2:  #1d1d28;
+      --border:   #242432;
+      --border-2: #2f2f40;
+      --accent:   #4f80ff;
+      --accent2:  #7c5cfc;
+      --mask:     #ff8050;
+      --text:     #dde1f0;
+      --muted:    #555566;
+      --label:    #9090b0;
+      --value:    #4f80ff;
+      --danger:   #ff4f6a;
+      --success:  #3ddc84;
+      --export:   #7c5cfc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font: 12px/1.5 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    body { display: flex; height: 100vh; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #sidebar-header {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #sidebar-header h1 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #fff;
+      text-transform: uppercase;
+    }
+    #sidebar-header p {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 3px;
+      letter-spacing: 0.04em;
+    }
+
+    #sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 0 20px;
+    }
+    #sidebar-scroll::-webkit-scrollbar { width: 3px; }
+    #sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+    #sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ── Drop zone ── */
+    #dropZone {
+      margin: 10px 14px;
+      border: 1.5px dashed var(--border);
+      border-radius: 8px;
+      padding: 14px 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: var(--panel);
+      position: relative;
+      overflow: hidden;
+    }
+    #dropZone:hover, #dropZone.drag { border-color: var(--accent); background: rgba(79,128,255,0.06); }
+    #dropZone img { width: 100%; height: 80px; object-fit: contain; display: none; border-radius: 4px; margin-bottom: 6px; }
+    #dropZone .drop-label { font-size: 11px; color: var(--label); line-height: 1.4; }
+    #dropZone .drop-label span { color: var(--accent); font-weight: 600; }
+    #dropZone .file-name { font-size: 10px; color: var(--label); margin-top: 4px; display: none; }
+    #fileInput { display: none; }
+
+    /* ── Section ── */
+    .section { padding: 10px 14px 0; }
+
+    .section-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      padding: 6px 0 8px;
+      border-top: 1px solid var(--border);
+    }
+    .section-title.purple { color: var(--accent2); }
+    .section-title.green  { color: var(--success); }
+    .section-title.mask   { color: var(--mask); }
+
+    /* Section title can be a folder header */
+    .section-title.collapsible { cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center; }
+    .section-title.collapsible::after { content: '▾'; font-size: 10px; opacity: 0.6; transition: transform 0.15s; }
+    .section-title.collapsible.collapsed::after { transform: rotate(-90deg); }
+    .section-body.collapsed { display: none; }
+
+    /* Direction grid (mask) */
+    .dir-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      margin: 4px 0 10px;
+    }
+    .dir-btn {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--label);
+      font: 14px/1 inherit;
+      height: 28px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .dir-btn:hover { border-color: var(--mask); color: var(--mask); }
+    .dir-btn.active {
+      background: rgba(255,128,80,0.15);
+      border-color: var(--mask);
+      color: var(--mask);
+      box-shadow: 0 0 0 1px var(--mask) inset;
+    }
+
+    /* Preset chips */
+    .preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin: 6px 0 10px;
+    }
+    .preset-chip {
+      padding: 4px 9px;
+      font: 10px/1.4 inherit;
+      letter-spacing: 0.03em;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      color: var(--label);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .preset-chip:hover { border-color: var(--mask); color: var(--mask); }
+
+    /* Color picker */
+    input[type=color] {
+      width: 36px;
+      height: 22px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type=color]::-webkit-color-swatch { border: none; border-radius: 3px; }
+    input[type=color]::-webkit-color-swatch-wrapper { padding: 1px; }
+
+    /* Keyboard hint */
+    .kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      font: 600 9px/1.2 'SF Mono','Menlo',monospace;
+      color: var(--label);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      margin: 0 2px;
+    }
+
+    /* ── Control row ── */
+    .ctrl {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .ctrl label {
+      font-size: 11px;
+      color: var(--label);
+      flex: 1;
+      white-space: nowrap;
+    }
+    .ctrl .val {
+      font-size: 11px;
+      color: var(--value);
+      font-weight: 600;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* Slider */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    .ctrl-slider { flex-direction: column; align-items: stretch; }
+    .ctrl-slider .ctrl-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .ctrl-slider .ctrl-head label { font-size: 11px; color: var(--label); }
+    .ctrl-slider .ctrl-head .val { font-size: 11px; color: var(--value); font-weight: 600; }
+
+    /* Toggle */
+    .toggle-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .toggle-wrap label { font-size: 11px; color: var(--label); }
+    .toggle {
+      width: 32px; height: 17px;
+      background: var(--border);
+      border-radius: 9px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 13px; height: 13px;
+      background: #fff;
+      border-radius: 50%;
+      top: 2px; left: 2px;
+      transition: left 0.2s;
+    }
+    .toggle.on::after { left: 17px; }
+
+    /* Text input */
+    .ctrl input[type=text], .ctrl select {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font: 11px/1 'SF Mono', 'Menlo', monospace;
+      padding: 5px 8px;
+      flex: 1;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .ctrl input[type=text]:focus, .ctrl select:focus { border-color: var(--accent); }
+    .ctrl select {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%239090b0' stroke-width='1.5' fill='none'/></svg>");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      padding-right: 22px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .ctrl select option { background: var(--panel-2); color: var(--text); }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 8px; margin-top: 4px; }
+    .btn {
+      flex: 1;
+      padding: 8px 4px;
+      border: none;
+      border-radius: 6px;
+      font: 600 11px/1 inherit;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.88; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary   { background: var(--accent);  color: #fff; }
+    .btn-secondary { background: var(--panel);   color: var(--label); border: 1px solid var(--border); }
+    .btn-export    { background: var(--export);  color: #fff; }
+    .btn-reset     { background: var(--panel);   color: var(--danger); border: 1px solid var(--border); }
+    .btn:disabled  { opacity: 0.35; cursor: not-allowed; }
+
+    /* Status */
+    #statusBar {
+      padding: 8px 14px;
+      font-size: 10px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      min-height: 32px;
+      display: flex;
+      align-items: center;
+    }
+    #statusBar.ok    { color: var(--success); }
+    #statusBar.err   { color: var(--danger); }
+
+    /* ── Canvas area ── */
+    #canvasArea {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    #canvasToolbar {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    #canvasToolbar .info { flex: 1; font-size: 10px; color: var(--muted); }
+    .zoom-ctrl { display: flex; align-items: center; gap: 6px; }
+    .zoom-btn  {
+      width: 22px; height: 22px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--panel);
+      color: var(--label);
+      font: 14px/1 monospace;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.12s;
+    }
+    .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
+    #zoomLabel { font-size: 11px; color: var(--value); font-weight: 600; min-width: 34px; text-align: center; }
+
+    #canvasWrap {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 24px;
+      position: relative;
+    }
+    #canvasWrap::-webkit-scrollbar { width: 6px; height: 6px; }
+    #canvasWrap::-webkit-scrollbar-track { background: transparent; }
+    #canvasWrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    #preview {
+      display: block;
+      image-rendering: auto;          /* crisp text, not pixelated */
+      border-radius: 8px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Origin marker for radial directions (click-to-set) */
+    #originMarker {
+      position: absolute;
+      width: 18px; height: 18px;
+      border: 2px solid var(--mask);
+      border-radius: 50%;
+      background: rgba(255,128,80,0.25);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 12px rgba(255,128,80,0.6);
+      z-index: 2;
+      display: none;
+    }
+    #originMarker::before, #originMarker::after {
+      content: ''; position: absolute; background: var(--mask);
+    }
+    #originMarker::before { left: 50%; top: -4px; bottom: -4px; width: 1px; transform: translateX(-50%); }
+    #originMarker::after  { top: 50%; left: -4px; right: -4px; height: 1px; transform: translateY(-50%); }
+
+    /* Compare mode overlay */
+    #compareWrap {
+      display: none;
+      position: absolute;
+      inset: 24px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+      z-index: 5;
+    }
+    #compareWrap.on { display: block; }
+    #compareWrap img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0a0a0c; }
+    #compareWrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; clip-path: inset(0 0 0 50%); }
+    #compareDivider {
+      position: absolute; top: 0; bottom: 0;
+      left: 50%;
+      width: 2px; background: var(--mask);
+      cursor: ew-resize;
+      z-index: 10;
+      transform: translateX(-50%);
+    }
+    #compareDivider::after {
+      content: '◆';
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--mask);
+      font-size: 20px;
+      text-shadow: 0 0 8px rgba(0,0,0,0.8);
+    }
+
+    /* Toolbar action buttons */
+    .toolbar-btn {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--panel);
+      color: var(--label);
+      font: 11px/1.4 inherit;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .toolbar-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .toolbar-btn.active { background: rgba(79,128,255,0.15); border-color: var(--accent); color: var(--accent); }
+
+    /* Loading indicator for exports */
+    .spinner {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border: 1.5px solid var(--accent);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #emptyState {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+    #emptyState .big { font-size: 48px; opacity: 0.3; }
+    #emptyState p { font-size: 12px; }
+
+    /* Frame scrubber */
+    #scrubber {
+      padding: 8px 16px;
+      border-top: 1px solid var(--border);
+      display: none;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    #scrubber input[type=range] { flex: 1; }
+    #frameLabel { font-size: 10px; color: var(--label); min-width: 50px; text-align: right; }
+    #playBtn {
+      width: 26px; height: 26px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--panel);
+      color: var(--text);
+      font-size: 11px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    #playBtn:hover { border-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+<aside id="sidebar">
+  <div id="sidebar-header">
+    <h1>ASCII Studio</h1>
+    <p>Standalone preview &amp; export</p>
+  </div>
+
+  <div id="sidebar-scroll">
+
+    <!-- Drop zone -->
+    <div class="section">
+      <div id="dropZone">
+        <img id="thumbImg" alt="" />
+        <div class="drop-label"><span>Click or drop</span> image, GIF or video</div>
+        <div class="file-name" id="dropFileName"></div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*,video/*,.gif" />
+    </div>
+
+    <!-- Quick actions -->
+    <div class="section" style="display:flex; gap:6px; padding-top:8px;">
+      <button class="btn btn-secondary" id="btnWebcam"  style="font-size:10px; padding:6px 4px;">📷 Webcam</button>
+      <button class="btn btn-secondary" id="btnCompare" style="font-size:10px; padding:6px 4px;">↔ Compare</button>
+      <button class="btn btn-secondary" id="btnShare"   style="font-size:10px; padding:6px 4px;">🔗 Share</button>
+    </div>
+
+    <!-- CHARACTER SET -->
+    <div class="section">
+      <div class="section-title">Character Set</div>
+
+      <div class="ctrl">
+        <label>Render Mode</label>
+        <select id="renderModeSelect">
+          <option value="ascii">ASCII Chars</option>
+          <option value="halftone">Halftone Dots</option>
+          <option value="block">Block Pixels</option>
+          <option value="geometric">Geometric</option>
+          <option value="braille">Braille (8× density)</option>
+          <option value="bayer">Bayer Dither</option>
+        </select>
+      </div>
+
+      <div class="ctrl" id="rampRow">
+        <label>Ramp</label>
+        <input type="text" id="ramp" value="@X&amp;$#x*+=-. " maxlength="32" style="max-width:130px;" />
+      </div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Width</label>
+          <span class="val" id="widthVal">130</span>
+        </div>
+        <input type="range" id="widthSlider" min="20" max="220" step="5" value="130" />
+      </div>
+    </div>
+
+    <!-- IMAGE ADJUSTMENTS -->
+    <div class="section">
+      <div class="section-title">Image Adjustments</div>
+
+      <div class="toggle-wrap">
+        <label>Color</label>
+        <div class="toggle on" id="colorToggle" data-key="color"></div>
+      </div>
+      <div class="toggle-wrap">
+        <label>Invert</label>
+        <div class="toggle on" id="invertToggle" data-key="invert"></div>
+      </div>
+      <div class="toggle-wrap">
+        <label>Auto Contrast</label>
+        <div class="toggle on" id="autoContrastToggle" data-key="autoContrast"></div>
+      </div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Cell Aspect</label>
+          <span class="val" id="cellAspectVal">1.00</span>
+        </div>
+        <input type="range" id="cellAspectSlider" min="0.3" max="2.0" step="0.05" value="1.0" />
+      </div>
+
+      <div class="toggle-wrap">
+        <label>Edge Detection</label>
+        <div class="toggle" id="edgeToggle" data-key="edgeOn"></div>
+      </div>
+      <div class="ctrl-slider ctrl" id="edgeRow" style="display:none;">
+        <div class="ctrl-head">
+          <label>Edge Threshold</label>
+          <span class="val" id="edgeVal">40</span>
+        </div>
+        <input type="range" id="edgeSlider" min="1" max="120" step="1" value="40" />
+      </div>
+    </div>
+
+    <!-- COLOR THEME -->
+    <div class="section">
+      <div class="section-title">🎨 Color Theme</div>
+      <div class="preset-row" id="themeRow">
+        <button class="preset-chip active" data-theme="auto">Auto</button>
+        <button class="preset-chip"        data-theme="matrix">Matrix</button>
+        <button class="preset-chip"        data-theme="amber">Amber</button>
+        <button class="preset-chip"        data-theme="cyber">Cyber</button>
+        <button class="preset-chip"        data-theme="mono">Mono</button>
+        <button class="preset-chip"        data-theme="sepia">Sepia</button>
+        <button class="preset-chip"        data-theme="custom">Custom</button>
+      </div>
+      <div id="customThemeBox" style="display:none;">
+        <div class="ctrl"><label>Foreground</label><input type="color" id="themeFg" value="#e6e6e6" /></div>
+        <div class="ctrl"><label>Background</label><input type="color" id="themeBg" value="#0a0a0c" /></div>
+      </div>
+    </div>
+
+    <!-- OVERLAY -->
+    <div class="section">
+      <div class="section-title">🪟 Overlay</div>
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head"><label>Scanlines</label><span class="val" id="scanlinesVal">0%</span></div>
+        <input type="range" id="scanlinesSlider" min="0" max="100" step="5" value="0" />
+      </div>
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head"><label>Vignette</label><span class="val" id="vignetteVal">0%</span></div>
+        <input type="range" id="vignetteSlider" min="0" max="100" step="5" value="0" />
+      </div>
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head"><label>Grain</label><span class="val" id="grainVal">0%</span></div>
+        <input type="range" id="grainSlider" min="0" max="100" step="5" value="0" />
+      </div>
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head"><label>Glow</label><span class="val" id="glowVal">0%</span></div>
+        <input type="range" id="glowSlider" min="0" max="100" step="5" value="0" />
+      </div>
+    </div>
+
+    <!-- ANIMATION -->
+    <div class="section" id="animSection" style="display:none;">
+      <div class="section-title purple">Animation</div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Max Frames</label>
+          <span class="val" id="maxFramesVal">24</span>
+        </div>
+        <input type="range" id="maxFramesSlider" min="4" max="60" step="2" value="24" />
+      </div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Sample FPS</label>
+          <span class="val" id="sampleFpsVal">12</span>
+        </div>
+        <input type="range" id="sampleFpsSlider" min="4" max="30" step="2" value="12" />
+      </div>
+    </div>
+
+    <!-- GIF EXPORT -->
+    <div class="section">
+      <div class="section-title green">GIF Export</div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Cell Size</label>
+          <span class="val" id="gifCellVal">6 px</span>
+        </div>
+        <input type="range" id="gifCellSlider" min="4" max="14" step="1" value="6" />
+      </div>
+
+      <div class="ctrl-slider ctrl" id="blendRow">
+        <div class="ctrl-head">
+          <label>Dissolve Steps</label>
+          <span class="val" id="blendStepsVal">20</span>
+        </div>
+        <input type="range" id="blendStepsSlider" min="4" max="40" step="2" value="20" />
+      </div>
+
+      <div class="ctrl-slider ctrl" id="holdRow">
+        <div class="ctrl-head">
+          <label>Hold Frames</label>
+          <span class="val" id="holdFramesVal">5</span>
+        </div>
+        <input type="range" id="holdFramesSlider" min="0" max="30" step="1" value="5" />
+      </div>
+
+      <div class="toggle-wrap" id="smoothMergeRow" style="display:none;">
+        <label>Smooth Merge</label>
+        <div class="toggle" id="smoothMergeToggle" data-key="smoothMerge"></div>
+      </div>
+    </div>
+
+    <!-- ── MASK REVEAL ── -->
+    <div class="section">
+      <div class="section-title mask">⚡ Mask Reveal</div>
+
+      <!-- Reveal scrubber -->
+      <div class="ctrl-slider ctrl" style="margin-bottom:8px;">
+        <div class="ctrl-head">
+          <label style="color:var(--text); font-weight:600;">Reveal</label>
+          <span class="val" id="maskProgressVal" style="color:var(--mask);">0%</span>
+        </div>
+        <input type="range" id="maskProgressSlider" min="0" max="100" step="1" value="0" style="accent-color:var(--mask);" />
+      </div>
+
+      <div class="btn-row" style="margin-bottom:8px;">
+        <button class="btn btn-secondary" id="btnMaskReset">↩ Reset</button>
+        <button class="btn" id="btnMaskPlay" style="background:var(--mask);color:#fff;">▶ Play</button>
+      </div>
+
+      <div class="toggle-wrap">
+        <label>Reverse (hide → reveal flips)</label>
+        <div class="toggle" id="reverseToggle"></div>
+      </div>
+
+      <div class="btn-row" style="margin-bottom:10px;">
+        <button class="btn btn-export" id="btnExportRevealGif" style="background:var(--mask);">▶ Export Reveal GIF</button>
+      </div>
+
+      <!-- Presets -->
+      <div style="font-size:9px;color:var(--label);letter-spacing:0.1em;margin-top:4px;">PRESETS</div>
+      <div class="preset-row" id="presetRow">
+        <button class="preset-chip" data-preset="wipe">Wipe</button>
+        <button class="preset-chip" data-preset="matrix">Matrix</button>
+        <button class="preset-chip" data-preset="glitch">Glitch</button>
+        <button class="preset-chip" data-preset="bloom">Bloom</button>
+        <button class="preset-chip" data-preset="wave">Wave</button>
+        <button class="preset-chip" data-preset="shatter">Shatter</button>
+        <button class="preset-chip" data-preset="halftone-print" style="border-color:#7c5cfc;color:#7c5cfc;">Halftone Print</button>
+      </div>
+
+      <!-- Direction grid -->
+      <div class="ctrl" style="margin-bottom:0;"><label>Direction</label></div>
+      <div class="dir-grid" id="dirGrid">
+        <button class="dir-btn active" data-dir="lr"        title="Left → Right">→</button>
+        <button class="dir-btn"        data-dir="rl"        title="Right → Left">←</button>
+        <button class="dir-btn"        data-dir="tb"        title="Top → Bottom">↓</button>
+        <button class="dir-btn"        data-dir="bt"        title="Bottom → Top">↑</button>
+        <button class="dir-btn"        data-dir="tl-br"     title="↖ → ↘">↘</button>
+        <button class="dir-btn"        data-dir="tr-bl"     title="↗ → ↙">↙</button>
+        <button class="dir-btn"        data-dir="bl-tr"     title="↙ → ↗">↗</button>
+        <button class="dir-btn"        data-dir="br-tl"     title="↘ → ↖">↖</button>
+        <button class="dir-btn"        data-dir="radial-out" title="Out from center">⊙</button>
+        <button class="dir-btn"        data-dir="radial-in"  title="In to center">⊚</button>
+        <button class="dir-btn"        data-dir="random"     title="Random scatter">✦</button>
+        <button class="dir-btn"        data-dir="diag-stripes" title="Diagonal stripes">≡</button>
+        <button class="dir-btn"        data-dir="paint"       title="Paint custom reveal — drag on canvas">✎</button>
+        <button class="dir-btn"        data-dir="multi-front" title="Two fronts colliding">⫸</button>
+      </div>
+      <div id="paintHelp" style="display:none; font-size:10px; color:var(--label); padding:6px 0; line-height:1.4;">
+        Click &amp; drag on canvas to paint reveal order.
+        <button id="btnClearPaint" style="float:right; padding:1px 6px; font-size:9px; border:1px solid var(--border); background:var(--panel); color:var(--label); border-radius:3px; cursor:pointer;">Clear</button>
+      </div>
+
+      <!-- Duration & easing -->
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Duration</label>
+          <span class="val" id="durationVal">2.0 s</span>
+        </div>
+        <input type="range" id="durationSlider" min="0.3" max="10" step="0.1" value="2.0" />
+      </div>
+
+      <div class="ctrl">
+        <label>Easing</label>
+        <select id="easingSelect">
+          <option value="linear">Linear</option>
+          <option value="in">Ease In</option>
+          <option value="out">Ease Out</option>
+          <option value="in-out">Ease In/Out</option>
+          <option value="step">Stepped</option>
+          <option value="exp">Exponential</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- ── FLIP EFFECT ── -->
+    <div class="section">
+      <div class="section-title mask">⚙ Flip Effect</div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Flip Duration</label>
+          <span class="val" id="flipDurVal">0.6 s</span>
+        </div>
+        <input type="range" id="flipDurSlider" min="0.05" max="2.5" step="0.05" value="0.6" />
+      </div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Flip Rate</label>
+          <span class="val" id="flipRateVal">20 ch/s</span>
+        </div>
+        <input type="range" id="flipRateSlider" min="5" max="80" step="5" value="20" />
+      </div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Vertical Jitter</label>
+          <span class="val" id="vertJitterVal">2 rows</span>
+        </div>
+        <input type="range" id="vertJitterSlider" min="0" max="10" step="1" value="2" />
+      </div>
+
+      <div class="ctrl">
+        <label>Charset</label>
+        <input type="text" id="flipCharsetInput" value="01/\_*+.-=" maxlength="24" style="max-width:120px;" />
+      </div>
+    </div>
+
+    <!-- ── DISTORTION ── -->
+    <div class="section">
+      <div class="section-title mask">〰 Distortion</div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Wave Amount</label>
+          <span class="val" id="waveAmtVal">0%</span>
+        </div>
+        <input type="range" id="waveAmtSlider" min="0" max="50" step="1" value="0" />
+      </div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Wave Frequency</label>
+          <span class="val" id="waveFreqVal">8</span>
+        </div>
+        <input type="range" id="waveFreqSlider" min="1" max="40" step="1" value="8" />
+      </div>
+
+      <div class="ctrl-slider ctrl">
+        <div class="ctrl-head">
+          <label>Edge Noise</label>
+          <span class="val" id="edgeNoiseVal">0%</span>
+        </div>
+        <input type="range" id="edgeNoiseSlider" min="0" max="50" step="1" value="0" />
+      </div>
+    </div>
+
+    <!-- ── COLOR ── -->
+    <div class="section">
+      <div class="section-title mask">🎨 Flip Color</div>
+
+      <div class="ctrl">
+        <label>Mode</label>
+        <select id="colorModeSelect">
+          <option value="fade-grey">Fade Grey</option>
+          <option value="glitch">Glitch RGB</option>
+          <option value="mono">Mono Accent</option>
+          <option value="opacity">Opacity Fade</option>
+          <option value="invert">Inverted</option>
+        </select>
+      </div>
+
+      <div class="ctrl" id="monoColorRow" style="display:none;">
+        <label>Accent</label>
+        <input type="color" id="monoColorInput" value="#ff8050" />
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="section">
+      <div class="section-title">📦 Export</div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btnPng"  disabled>PNG</button>
+        <button class="btn btn-secondary" id="btnSvg"  disabled>SVG</button>
+        <button class="btn btn-secondary" id="btnTxt"  disabled>TXT</button>
+      </div>
+      <div class="btn-row" style="margin-top:6px;">
+        <button class="btn btn-secondary" id="btnHtml" disabled>HTML</button>
+        <button class="btn btn-secondary" id="btnMd"   disabled>MD</button>
+        <button class="btn btn-secondary" id="btnAnsi" disabled>ANSI</button>
+      </div>
+      <div class="btn-row" style="margin-top:6px;">
+        <button class="btn btn-export" id="btnGif" disabled>Export GIF</button>
+      </div>
+      <div class="btn-row" style="margin-top:6px;">
+        <button class="btn btn-secondary" id="btnReset">Reset All Settings</button>
+      </div>
+    </div>
+
+  </div><!-- end sidebar-scroll -->
+
+  <div id="statusBar">Drop a file to start</div>
+  <div style="padding:6px 14px 10px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);line-height:1.6;flex-shrink:0;">
+    <span class="kbd">Space</span> play/pause &nbsp;
+    <span class="kbd">R</span> reset &nbsp;
+    <span class="kbd">←</span> <span class="kbd">→</span> scrub
+  </div>
+</aside>
+
+<!-- ── Canvas area ─────────────────────────────────────────────────────── -->
+<main id="canvasArea">
+
+  <div id="canvasToolbar">
+    <span class="info" id="infoLabel">—</span>
+    <div class="zoom-ctrl">
+      <button class="zoom-btn" id="zoomOut">−</button>
+      <span id="zoomLabel">100%</span>
+      <button class="zoom-btn" id="zoomIn">+</button>
+      <button class="zoom-btn" id="zoomFit" style="width:auto;padding:0 8px;font:11px inherit;">Fit</button>
+    </div>
+  </div>
+
+  <div id="canvasWrap">
+    <div style="position:relative; display:inline-block;">
+      <canvas id="preview"></canvas>
+      <div id="originMarker"></div>
+    </div>
+    <div id="emptyState">
+      <div class="big">⠿</div>
+      <p>Drop an image, GIF or video to begin</p>
+    </div>
+    <div id="compareWrap">
+      <img id="compareImg" alt="" />
+      <canvas id="compareCanvas"></canvas>
+      <div id="compareDivider"></div>
+    </div>
+  </div>
+
+  <div id="scrubber">
+    <button id="playBtn">▶</button>
+    <input type="range" id="frameSlider" min="0" max="0" step="1" value="0" />
+    <span id="frameLabel">0 / 0</span>
+  </div>
+
+</main>
+
+<!-- SCRIPT -->
+</body>
+</html>

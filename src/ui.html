@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ASCII Art</title>
+  <style>
+    :root {
+      --bg: #f4f4f4;
+      --fg: #1a1a1a;
+      --muted: #888;
+      --border: #e0e0e0;
+      --accent: #18a0fb;
+      --accent-hover: #0d8fe6;
+      --disabled: #d9d9d9;
+      --panel: #ffffff;
+      --success: #2ea043;
+      --export: #6f42c1;
+      --export-hover: #5a32a3;
+      --upgrade: #f5a623;
+      --upgrade-hover: #e09515;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    body { display: flex; flex-direction: column; height: 100vh; padding: 14px; gap: 10px; }
+
+    /* ── Drop zone ── */
+    .drop {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .drop:hover, .drop.dragging { border-color: var(--accent); background: rgba(24,160,251,0.04); }
+    .drop button {
+      padding: 4px 10px;
+      border: 1px solid var(--fg);
+      border-radius: 4px;
+      background: var(--panel);
+      font: inherit;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .drop .label { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #file { display: none; }
+
+    /* ── Quota bar ── */
+    .quota-bar {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .quota-bar .quota-items {
+      flex: 1;
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .quota-item { display: flex; align-items: center; gap: 4px; }
+    .quota-item .pip {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .quota-item .pip.warn { background: var(--upgrade); }
+    .quota-item .pip.danger { background: #d73a49; }
+    .btn-upgrade {
+      padding: 4px 10px;
+      border: none;
+      border-radius: 4px;
+      background: var(--upgrade);
+      color: white;
+      font: 600 11px/1 inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-upgrade:hover { background: var(--upgrade-hover); }
+
+    /* ── Preview ── */
+    .preview {
+      flex: 1;
+      background: #0a0a0c;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      position: relative;
+      min-height: 0;
+    }
+    .preview pre {
+      margin: 0;
+      padding: 10px;
+      font: 4px/1 'SF Mono', 'Menlo', 'Consolas', monospace;
+      white-space: pre;
+      color: #e6e6e6;
+    }
+
+    /* ── Paywall overlay ── */
+    .paywall {
+      position: absolute;
+      inset: 0;
+      background: rgba(10,10,12,0.88);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .paywall h3 { margin: 0; font-size: 14px; color: #fff; }
+    .paywall p  { margin: 0; font-size: 12px; color: rgba(255,255,255,0.6); }
+    .btn-upgrade-large {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: var(--upgrade);
+      color: white;
+      font: 600 13px/1 inherit;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    .btn-upgrade-large:hover { background: var(--upgrade-hover); }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      flex-shrink: 0;
+    }
+    .btn-primary { background: var(--disabled); color: var(--muted); cursor: not-allowed; }
+    .btn-primary:not(:disabled) { background: var(--accent); color: white; cursor: pointer; }
+    .btn-primary:not(:disabled):hover { background: var(--accent-hover); }
+    .btn-export { background: var(--export); color: white; cursor: pointer; display: none; }
+    .btn-export:hover { background: var(--export-hover); }
+
+    /* ── Status ── */
+    .status { font-size: 11px; color: var(--muted); text-align: center; min-height: 14px; flex-shrink: 0; }
+    .status.error   { color: #d73a49; }
+    .status.success { color: var(--success); font-weight: 500; }
+  </style>
+</head>
+<body>
+  <!-- File picker -->
+  <div class="drop" id="drop">
+    <button type="button" id="browseBtn">Choose file</button>
+    <span class="label" id="fileName">No file chosen</span>
+    <input type="file" id="file" accept="image/*,video/*,.gif" />
+    <span id="ownerBadge" style="display:none; background:linear-gradient(135deg,#f5a623,#e05c1a); color:#fff; font-size:9px; font-weight:700; letter-spacing:0.04em; padding:2px 7px; border-radius:20px; white-space:nowrap; flex-shrink:0;">OWNER</span>
+  </div>
+
+  <!-- Owner-only: debug mode switcher -->
+  <div id="modeSwitcher" style="display:none; align-items:center; justify-content:flex-end; gap:8px; flex-shrink:0;">
+    <span style="font-size:10px; color:#aaa; user-select:none;">Debug view:</span>
+    <button id="modeBtn" style="padding:3px 10px; border-radius:20px; border:1.5px solid #f5a623; background:transparent; color:#f5a623; font:700 9px/1.6 -apple-system,sans-serif; letter-spacing:0.06em; cursor:pointer; transition:all 0.15s;">⚙ OWNER MODE</button>
+  </div>
+
+  <!-- Quota bar (hidden for paid users) -->
+  <div class="quota-bar" id="quotaBar" style="display:none">
+    <div class="quota-items">
+      <div class="quota-item">
+        <span class="pip" id="imgPip"></span>
+        <span id="imgQuota">Images: —</span>
+      </div>
+      <div class="quota-item">
+        <span class="pip" id="vidPip"></span>
+        <span id="vidQuota">Videos: —</span>
+      </div>
+    </div>
+    <button class="btn-upgrade" id="upgradeBtn">Upgrade ✦</button>
+  </div>
+
+  <!-- Preview + paywall overlay -->
+  <div class="preview" id="previewWrap">
+    <pre id="preview" style="display:none;"></pre>
+    <span id="emptyMsg"></span>
+    <div class="paywall" id="paywall" style="display:none">
+      <h3>Free limit reached</h3>
+      <p id="paywallMsg">Upgrade to insert unlimited ASCII art.</p>
+      <button class="btn-upgrade-large" id="upgradeBtn2">Unlock Unlimited ✦</button>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <button class="btn btn-primary" id="insert" disabled>Insert ASCII into Figma</button>
+  <button class="btn btn-export" id="exportGif">Export Animation as GIF</button>
+
+  <!-- Owner-only: Smooth Merge toggle -->
+  <label id="smoothMergeWrap" style="display:none; align-items:center; gap:8px; font-size:12px; color:#888; flex-shrink:0; cursor:pointer; user-select:none;">
+    <input type="checkbox" id="smoothMerge" style="width:14px; height:14px; accent-color:#f5a623; cursor:pointer;" />
+    <span>Smooth Merge <span style="background:linear-gradient(135deg,#f5a623,#e05c1a); color:#fff; font-size:9px; font-weight:700; padding:1px 5px; border-radius:10px; letter-spacing:0.04em;">OWNER</span></span>
+  </label>
+
+  <!-- Dev helper: shown only when OWNER_ID is not set in code.ts -->
+  <div id="idBox" style="display:none; background:#1a1a2e; border:1px solid #f5a623; border-radius:8px; padding:10px 12px; font-size:11px; color:#f5a623; word-break:break-all; flex-shrink:0;">
+    <strong>Your Figma ID (paste into OWNER_ID):</strong><br/>
+    <span id="idValue" style="font-family:monospace; user-select:all;">—</span>
+  </div>
+
+  <!-- SCRIPT -->
+</body>
+</html>
