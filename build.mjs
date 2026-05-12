@@ -1,7 +1,10 @@
 import * as esbuild from 'esbuild';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const exec = promisify(execFile);
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = __dirname;
@@ -10,6 +13,38 @@ const DEV   = process.argv.includes('--dev') || WATCH;
 const PROD  = !DEV;
 
 await mkdir(resolve(ROOT, 'dist'), { recursive: true });
+await mkdir(resolve(ROOT, 'dist/docs'), { recursive: true });
+
+// Sync docs/og-image.png into dist/docs so the OG preview works when serving dist/.
+// If the PNG is missing OR the SVG is newer, regenerate via macOS qlmanage + sips.
+async function syncOgImage() {
+  const svg = resolve(ROOT, 'docs/og-image.svg');
+  const png = resolve(ROOT, 'docs/og-image.png');
+  let needRegen = false;
+  try {
+    const [svgStat, pngStat] = await Promise.all([stat(svg), stat(png).catch(() => null)]);
+    if (!pngStat || svgStat.mtimeMs > pngStat.mtimeMs) needRegen = true;
+  } catch {}
+  if (needRegen && process.platform === 'darwin') {
+    try {
+      // qlmanage renders the SVG; sips trims/resizes to OG dimensions
+      await exec('qlmanage', ['-t', '-s', '1200', '-o', resolve(ROOT, 'docs'), svg]);
+      // qlmanage writes "og-image.svg.png" — rename + resize
+      const tmp = resolve(ROOT, 'docs/og-image.svg.png');
+      await exec('mv', [tmp, png]);
+      await exec('sips', ['-z', '630', '1200', png]);
+      console.log('  docs/og-image.png regenerated from SVG');
+    } catch (err) {
+      console.warn('  Could not regenerate og-image.png:', err.message);
+    }
+  }
+  // Copy PNG (+ SVG fallback) into dist/docs
+  try {
+    await exec('cp', [png,                            resolve(ROOT, 'dist/docs/og-image.png')]);
+    await exec('cp', [resolve(ROOT, 'docs/og-image.svg'), resolve(ROOT, 'dist/docs/og-image.svg')]);
+  } catch {}
+}
+await syncOgImage();
 
 // Shared production-hardening options (minify + mangle + strip)
 const prodOpts = PROD ? {
