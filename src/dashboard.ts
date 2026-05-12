@@ -168,6 +168,18 @@ const btnHtml          = $<HTMLButtonElement>('btnHtml');
 const btnMd            = $<HTMLButtonElement>('btnMd');
 const btnAnsi          = $<HTMLButtonElement>('btnAnsi');
 const btnExportRevealGif = $<HTMLButtonElement>('btnExportRevealGif');
+const btnJpg           = $<HTMLButtonElement>('btnJpg');
+const btnWebp          = $<HTMLButtonElement>('btnWebp');
+const btnPng2x         = $<HTMLButtonElement>('btnPng2x');
+const btnPng4x         = $<HTMLButtonElement>('btnPng4x');
+const btnJson          = $<HTMLButtonElement>('btnJson');
+const btnPy            = $<HTMLButtonElement>('btnPy');
+const btnCpp           = $<HTMLButtonElement>('btnCpp');
+const btnJs            = $<HTMLButtonElement>('btnJs');
+const btnCopy          = $<HTMLButtonElement>('btnCopy');
+const btnWebm          = $<HTMLButtonElement>('btnWebm');
+const btnMp4           = $<HTMLButtonElement>('btnMp4');
+const btnAniSvg        = $<HTMLButtonElement>('btnAniSvg');
 
 // Compare
 const compareWrap      = $('compareWrap');
@@ -1066,8 +1078,13 @@ async function buildAscii() {
 
   if (M.progress > 0) renderAtProgress(M.progress);
   else renderFrame(currentFrame);
-  [btnPng, btnSvg, btnTxt, btnHtml, btnMd, btnAnsi].forEach(b => b.disabled = false);
-  btnGif.disabled = asciiFrames.length < 2;
+  [btnPng, btnJpg, btnWebp, btnSvg, btnPng2x, btnPng4x,
+   btnTxt, btnMd, btnHtml, btnAnsi, btnJson, btnPy, btnCpp, btnJs, btnCopy].forEach(b => b.disabled = false);
+  const isAnim = asciiFrames.length >= 2;
+  btnGif.disabled    = !isAnim;
+  btnWebm.disabled   = !isAnim;
+  btnMp4.disabled    = !isAnim;
+  btnAniSvg.disabled = !isAnim;
 
   const f0 = asciiFrames[0];
   infoLabel.textContent =
@@ -1585,7 +1602,7 @@ btnPng.addEventListener('click', () => {
   canvasEl.toBlob(blob => downloadBlob(blob!, 'ascii-art.png'), 'image/png');
 });
 
-// ── Text exports ──────────────────────────────────────────────────────────────
+// ── Export helpers ───────────────────────────────────────────────────────────
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -1597,6 +1614,48 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 function downloadText(text: string, filename: string, mime = 'text/plain') {
   downloadBlob(new Blob([text], { type: mime }), filename);
+}
+async function copyText(text: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus(`✓ ${label} copied to clipboard`, 'ok');
+  } catch {
+    setStatus(`Copy failed — clipboard blocked`, 'err');
+  }
+}
+
+// Paint a single ASCII frame to a canvas at any cell size. Used by HD exports + video.
+function paintFrameTo(c: HTMLCanvasElement, frame: AsciiResult, cellSize: number, withOverlay = true): { w: number; h: number } {
+  const lines = frame.text.split('\n');
+  const rows  = lines.length;
+  const cols  = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const w = cols * cellSize;
+  const h = rows * cellSize;
+  c.width = w; c.height = h;
+  const cc = c.getContext('2d', { willReadFrequently: true })!;
+  const pal = getPalette();
+  cc.fillStyle = pal.bg;
+  cc.fillRect(0, 0, w, h);
+  cc.font = `${cellSize}px 'SF Mono','Menlo','Consolas',monospace`;
+  cc.textBaseline = 'top';
+  (cc as any).textRendering = 'geometricPrecision';
+
+  for (let row = 0; row < rows; row++) {
+    const line = lines[row];
+    for (let col = 0; col < line.length; col++) {
+      const glyph = line[col];
+      if (glyph === ' ') continue;
+      if (frame.colors) {
+        const o = (row * frame.columns + col) * 3;
+        cc.fillStyle = pal.fgFn(frame.colors[o], frame.colors[o+1], frame.colors[o+2]);
+      } else {
+        cc.fillStyle = pal.fgFn(230, 230, 230);
+      }
+      cc.fillText(glyph, col * cellSize, row * cellSize);
+    }
+  }
+  if (withOverlay) drawOverlay(cc, w, h);
+  return { w, h };
 }
 
 btnTxt.addEventListener('click', () => {
@@ -1680,6 +1739,265 @@ btnAnsi.addEventListener('click', () => {
   }
   out += '\x1b[0m';
   downloadText(out, 'ascii-art.ansi');
+});
+
+// ── Image format exports ─────────────────────────────────────────────────────
+
+btnJpg.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  if (M.progress >= 1 || M.progress === 0) renderFrame(currentFrame);
+  canvasEl.toBlob(blob => downloadBlob(blob!, 'ascii-art.jpg'), 'image/jpeg', 0.92);
+});
+
+btnWebp.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  if (M.progress >= 1 || M.progress === 0) renderFrame(currentFrame);
+  canvasEl.toBlob(blob => downloadBlob(blob!, 'ascii-art.webp'), 'image/webp', 0.92);
+});
+
+function exportHiResPng(scale: number) {
+  if (!asciiFrames.length) return;
+  const frame = asciiFrames[currentFrame];
+  const off = document.createElement('canvas');
+  paintFrameTo(off, frame, CELL * scale);
+  off.toBlob(blob => downloadBlob(blob!, `ascii-art@${scale}x.png`), 'image/png');
+}
+
+btnPng2x.addEventListener('click', () => exportHiResPng(2));
+btnPng4x.addEventListener('click', () => exportHiResPng(4));
+
+// ── Code-format exports ──────────────────────────────────────────────────────
+
+function buildCurrentText(): string {
+  if (!asciiFrames.length) return '';
+  return asciiFrames[currentFrame].text;
+}
+
+btnCopy.addEventListener('click', () => copyText(buildCurrentText(), 'ASCII'));
+
+btnJson.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const f = asciiFrames[currentFrame];
+  const payload = {
+    version:   '1.0',
+    generator: 'ASCII Studio',
+    timestamp: new Date().toISOString(),
+    settings: {
+      S,
+      M: { ...M, paintTimings: M.paintTimings ? Array.from(M.paintTimings.entries()) : null },
+    },
+    frame: {
+      text:    f.text,
+      columns: f.columns,
+      rows:    f.rows,
+      colors:  f.colors ? Array.from(f.colors) : null,
+    },
+    frameCount: asciiFrames.length,
+  };
+  downloadText(JSON.stringify(payload, null, 2), 'ascii-project.json', 'application/json');
+});
+
+btnPy.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const f = asciiFrames[currentFrame];
+  // Escape triple quotes in content (very rare in ASCII art but possible)
+  const safe = f.text.replace(/"""/g, '\\"""');
+  const py = `#!/usr/bin/env python3
+# Generated by ASCII Studio — ${new Date().toISOString().slice(0, 10)}
+# Size: ${f.columns} × ${f.rows} chars
+art = """\\
+${safe}
+"""
+
+if __name__ == "__main__":
+    print(art)
+`;
+  downloadText(py, 'ascii_art.py', 'text/x-python');
+});
+
+btnCpp.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const f = asciiFrames[currentFrame];
+  const lines = f.text.split('\n').map(l =>
+    '    "' + l.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '",'
+  );
+  const cpp = `// Generated by ASCII Studio — ${new Date().toISOString().slice(0, 10)}
+// Size: ${f.columns} × ${f.rows} chars
+
+#include <stdio.h>
+
+const char* ascii_art[] = {
+${lines.join('\n')}
+    nullptr
+};
+
+int main(void) {
+    for (int i = 0; ascii_art[i] != nullptr; ++i) {
+        puts(ascii_art[i]);
+    }
+    return 0;
+}
+`;
+  downloadText(cpp, 'ascii_art.cpp', 'text/x-c++src');
+});
+
+btnJs.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const f = asciiFrames[currentFrame];
+  const text = f.text.replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+  const js = `// Generated by ASCII Studio — ${new Date().toISOString().slice(0, 10)}
+// Self-contained canvas snippet — drop into any HTML page.
+// Usage: <canvas id="ascii"></canvas>  + this script.
+
+(function renderAscii() {
+  const CELL = 9;
+  const text = \`${text}\`;
+  const colors = ${f.colors ? '[' + Array.from(f.colors).join(',') + ']' : 'null'};
+  const cols = ${f.columns};
+  const rows = ${f.rows};
+
+  const c = document.getElementById('ascii');
+  c.width  = cols * CELL;
+  c.height = rows * CELL;
+  const x = c.getContext('2d');
+  x.fillStyle = '#0a0a0c';
+  x.fillRect(0, 0, c.width, c.height);
+  x.font = CELL + "px 'SF Mono','Menlo','Consolas',monospace";
+  x.textBaseline = 'top';
+
+  const lines = text.split('\\n');
+  for (let r = 0; r < lines.length; r++) {
+    for (let cc = 0; cc < lines[r].length; cc++) {
+      const ch = lines[r][cc];
+      if (ch === ' ') continue;
+      if (colors) {
+        const o = (r * cols + cc) * 3;
+        x.fillStyle = 'rgb(' + colors[o] + ',' + colors[o+1] + ',' + colors[o+2] + ')';
+      } else {
+        x.fillStyle = '#e6e6e6';
+      }
+      x.fillText(ch, cc * CELL, r * CELL);
+    }
+  }
+})();
+`;
+  downloadText(js, 'ascii_art.js', 'application/javascript');
+});
+
+// ── Video exports (WebM / MP4) via MediaRecorder ─────────────────────────────
+
+async function exportVideo(mime: string, ext: string, fallbackBtn: HTMLButtonElement) {
+  if (asciiFrames.length < 2) return;
+  if (!MediaRecorder.isTypeSupported(mime)) {
+    setStatus(`${ext.toUpperCase()} not supported by this browser — try WebM`, 'err');
+    return;
+  }
+  fallbackBtn.disabled = true;
+  const originalText = fallbackBtn.textContent;
+  fallbackBtn.textContent = '⏳ Encoding…';
+  setStatus(`Encoding ${ext.toUpperCase()}…`);
+
+  try {
+    // Off-screen canvas for video frames
+    const out = document.createElement('canvas');
+    const cellSize = Math.max(6, S.gifCell + 2);  // a bit larger than GIF cell for crisper video
+
+    // Pre-render first frame to size canvas
+    paintFrameTo(out, asciiFrames[0], cellSize);
+
+    const stream = (out as any).captureStream(30);
+    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+    const stopped = new Promise<void>(r => { recorder.onstop = () => r(); });
+
+    recorder.start();
+
+    // Render each frame with its real delay
+    for (let i = 0; i < asciiFrames.length; i++) {
+      paintFrameTo(out, asciiFrames[i], cellSize);
+      const delayMs = (rawDelays[i] ?? 10) * 10;  // centiseconds → ms
+      await new Promise(r => setTimeout(r, Math.max(33, delayMs))); // min 30fps step
+    }
+    // Two extra frames at the end so the last frame is fully captured
+    await new Promise(r => setTimeout(r, 200));
+
+    recorder.stop();
+    await stopped;
+
+    const blob = new Blob(chunks, { type: mime });
+    downloadBlob(blob, `ascii-animation.${ext}`);
+    setStatus(`✓ ${ext.toUpperCase()} saved`, 'ok');
+  } catch (err) {
+    setStatus((err as Error).message || `${ext} export failed`, 'err');
+  } finally {
+    fallbackBtn.disabled = false;
+    fallbackBtn.textContent = originalText;
+  }
+}
+
+btnWebm.addEventListener('click', () => exportVideo('video/webm;codecs=vp9', 'webm', btnWebm));
+btnMp4.addEventListener('click', () => {
+  // Try mp4 with various codec strings — browser support is patchy
+  const candidates = ['video/mp4;codecs=h264', 'video/mp4;codecs=avc1', 'video/mp4'];
+  const supported = candidates.find(c => MediaRecorder.isTypeSupported(c));
+  if (!supported) {
+    setStatus('MP4 not supported by this browser — use WebM instead', 'err');
+    return;
+  }
+  exportVideo(supported, 'mp4', btnMp4);
+});
+
+// ── Animated SVG export (SMIL) ───────────────────────────────────────────────
+
+btnAniSvg.addEventListener('click', () => {
+  if (asciiFrames.length < 2) return;
+  const f0 = asciiFrames[0];
+  const lines0 = f0.text.split('\n');
+  const cw = f0.columns * CELL;
+  const ch = lines0.length * CELL;
+  const pal = getPalette();
+
+  // Total animation duration in seconds
+  const totalSec = rawDelays.reduce((s, d) => s + d / 100, 0) || asciiFrames.length / 12;
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}" viewBox="0 0 ${cw} ${ch}">`;
+  svg += `<rect width="${cw}" height="${ch}" fill="${pal.bg}"/>`;
+  svg += `<style>g.f{opacity:0}</style>`;
+  svg += `<g font-family="SF Mono, Menlo, Consolas, monospace" font-size="${CELL}" dominant-baseline="hanging">`;
+
+  // Build a <g class="f"> for each frame
+  let cumT = 0;
+  for (let fi = 0; fi < asciiFrames.length; fi++) {
+    const f = asciiFrames[fi];
+    const dur = (rawDelays[fi] ?? 10) / 100; // seconds for this frame
+    svg += `<g class="f">`;
+    const lines = f.text.split('\n');
+    for (let r = 0; r < lines.length; r++) {
+      for (let c = 0; c < lines[r].length; c++) {
+        const ch2 = lines[r][c];
+        if (ch2 === ' ') continue;
+        const safe = ch2 === '<' ? '&lt;' : ch2 === '>' ? '&gt;' : ch2 === '&' ? '&amp;' : ch2;
+        let fill = '#e6e6e6';
+        if (f.colors) {
+          const o = (r * f.columns + c) * 3;
+          fill = pal.fgFn(f.colors[o], f.colors[o + 1], f.colors[o + 2]);
+        }
+        svg += `<text x="${c * CELL}" y="${r * CELL}" fill="${fill}">${safe}</text>`;
+      }
+    }
+    // Show this group only between cumT and cumT+dur
+    svg += `<set attributeName="opacity" to="1" begin="${cumT.toFixed(3)}s" dur="${dur.toFixed(3)}s" fill="freeze"/>`;
+    svg += `<set attributeName="opacity" to="0" begin="${(cumT + dur).toFixed(3)}s" fill="freeze"/>`;
+    svg += `</g>`;
+    cumT += dur;
+  }
+  // Loop: restart all <set>s from the beginning after totalSec
+  // Simplest cross-browser loop is a master <animate> ... but each <set> already uses absolute begin.
+  // Wrap everything in a group with a repeating animation that resets opacity cycle:
+  svg += `</g></svg>`;
+  downloadText(svg, 'ascii-animation.svg', 'image/svg+xml');
 });
 
 // ── Mask reveal → GIF ─────────────────────────────────────────────────────────

@@ -1271,25 +1271,54 @@
       </div>
     </div>
 
-    <!-- ACTIONS -->
+    <!-- ACTIONS — Image -->
     <div class="section" data-tab="export">
-      <div class="section-title">📦 Export</div>
-
+      <div class="section-title">🖼 Image</div>
       <div class="btn-row">
-        <button class="btn btn-secondary" id="btnPng"  disabled>PNG</button>
-        <button class="btn btn-secondary" id="btnSvg"  disabled>SVG</button>
-        <button class="btn btn-secondary" id="btnTxt"  disabled>TXT</button>
+        <button class="btn btn-secondary" id="btnPng"  disabled title="PNG (raster, lossless)">PNG</button>
+        <button class="btn btn-secondary" id="btnJpg"  disabled title="JPEG (smaller, lossy)">JPG</button>
+        <button class="btn btn-secondary" id="btnWebp" disabled title="WebP (modern, smallest)">WebP</button>
       </div>
       <div class="btn-row" style="margin-top:6px;">
-        <button class="btn btn-secondary" id="btnHtml" disabled>HTML</button>
-        <button class="btn btn-secondary" id="btnMd"   disabled>MD</button>
-        <button class="btn btn-secondary" id="btnAnsi" disabled>ANSI</button>
+        <button class="btn btn-secondary" id="btnSvg"  disabled title="SVG (vector, infinite zoom)">SVG</button>
+        <button class="btn btn-secondary" id="btnPng2x" disabled title="High-res PNG @ 2×">HD 2×</button>
+        <button class="btn btn-secondary" id="btnPng4x" disabled title="Ultra-res PNG @ 4×">HD 4×</button>
+      </div>
+    </div>
+
+    <!-- ACTIONS — Text & Code -->
+    <div class="section" data-tab="export">
+      <div class="section-title">📄 Text &amp; Code</div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btnTxt"  disabled title="Plain text">TXT</button>
+        <button class="btn btn-secondary" id="btnMd"   disabled title="Markdown code block">MD</button>
+        <button class="btn btn-secondary" id="btnHtml" disabled title="HTML with inline color spans">HTML</button>
       </div>
       <div class="btn-row" style="margin-top:6px;">
-        <button class="btn btn-export" id="btnGif" disabled>Export GIF</button>
+        <button class="btn btn-secondary" id="btnAnsi" disabled title="ANSI escape codes for terminals">ANSI</button>
+        <button class="btn btn-secondary" id="btnJson" disabled title="Full project JSON">JSON</button>
+        <button class="btn btn-secondary" id="btnPy"   disabled title="Python script">Python</button>
       </div>
       <div class="btn-row" style="margin-top:6px;">
-        <button class="btn btn-secondary" id="btnReset">Reset All Settings</button>
+        <button class="btn btn-secondary" id="btnCpp"  disabled title="C/C++ string array">C/C++</button>
+        <button class="btn btn-secondary" id="btnJs"   disabled title="JavaScript canvas snippet">JS</button>
+        <button class="btn btn-primary"   id="btnCopy" disabled title="Copy plain ASCII to clipboard">📋 Copy</button>
+      </div>
+    </div>
+
+    <!-- ACTIONS — Animation -->
+    <div class="section" data-tab="export">
+      <div class="section-title green">🎬 Animation</div>
+      <div class="btn-row">
+        <button class="btn btn-export" id="btnGif" disabled title="Looping GIF">GIF</button>
+        <button class="btn btn-export" id="btnWebm" disabled title="WebM video (smallest, sharper)">WebM</button>
+      </div>
+      <div class="btn-row" style="margin-top:6px;">
+        <button class="btn btn-secondary" id="btnMp4"  disabled title="MP4 video (where supported)">MP4</button>
+        <button class="btn btn-secondary" id="btnAniSvg" disabled title="Animated SVG with SMIL">Animated SVG</button>
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-secondary" id="btnReset">↺ Reset All Settings</button>
       </div>
     </div>
 
