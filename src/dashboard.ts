@@ -64,6 +64,28 @@ import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+// ── Tab switching (Style / Reveal / Export) ──────────────────────────────────
+(function tabSwitcher() {
+  const sidebar = document.getElementById('sidebar')!;
+  const btns = document.querySelectorAll<HTMLButtonElement>('.tab-btn');
+  const STORAGE = 'ascii_studio_tab';
+  // Restore previous tab
+  const saved = (() => { try { return localStorage.getItem(STORAGE); } catch { return null; } })();
+  if (saved && ['style', 'mask', 'export'].includes(saved)) {
+    sidebar.setAttribute('data-tab', saved);
+    btns.forEach(b => b.classList.toggle('active', b.dataset.tab === saved));
+  }
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab!;
+      btns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      sidebar.setAttribute('data-tab', tab);
+      try { localStorage.setItem(STORAGE, tab); } catch {}
+    });
+  });
+})();
+
 const dropZone         = $('dropZone');
 const fileInput        = $<HTMLInputElement>('fileInput');
 const thumbImg         = $<HTMLImageElement>('thumbImg');
