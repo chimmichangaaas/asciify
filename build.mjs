@@ -25,17 +25,25 @@ async function syncOgImage() {
     const [svgStat, pngStat] = await Promise.all([stat(svg), stat(png).catch(() => null)]);
     if (!pngStat || svgStat.mtimeMs > pngStat.mtimeMs) needRegen = true;
   } catch {}
-  if (needRegen && process.platform === 'darwin') {
+  if (needRegen) {
+    // Build the OG card directly via Python PIL — pixel-perfect 1200×630 with
+    // the logo centered on pure black. Avoids qlmanage's square-thumbnail
+    // squashing that left whitespace bars in earlier attempts.
     try {
-      // qlmanage renders the SVG; sips trims/resizes to OG dimensions
-      await exec('qlmanage', ['-t', '-s', '1200', '-o', resolve(ROOT, 'docs'), svg]);
-      // qlmanage writes "og-image.svg.png" — rename + resize
-      const tmp = resolve(ROOT, 'docs/og-image.svg.png');
-      await exec('mv', [tmp, png]);
-      await exec('sips', ['-z', '630', '1200', png]);
-      console.log('  docs/og-image.png regenerated from SVG');
+      const script = `
+from PIL import Image
+logo = Image.open('docs/logo.png').convert('RGBA')
+SIZE = 480
+logo = logo.resize((SIZE, SIZE), Image.LANCZOS)
+W, H = 1200, 630
+canvas = Image.new('RGB', (W, H), (0, 0, 0))
+canvas.paste(logo, ((W - SIZE) // 2, (H - SIZE) // 2), logo)
+canvas.save('docs/og-image.png', 'PNG', optimize=True)
+`;
+      await exec('python3', ['-c', script]);
+      console.log('  docs/og-image.png regenerated via PIL');
     } catch (err) {
-      console.warn('  Could not regenerate og-image.png:', err.message);
+      console.warn('  Could not regenerate og-image.png (need python3 + PIL):', err.message);
     }
   }
   // Copy PNG (+ SVG fallback + default-preview AVIF) into dist/docs
