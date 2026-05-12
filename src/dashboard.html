@@ -201,26 +201,39 @@
       margin: 0 2px;
     }
 
-    /* Author card */
+    /* Author card — floating pill in bottom-right corner of canvas area */
     #authorCard {
-      padding: 12px 14px;
-      border-top: 1px solid var(--border);
+      position: absolute;
+      bottom: 18px;
+      right: 18px;
+      z-index: 8;
+      padding: 8px 12px 8px 8px;
       display: flex;
       align-items: center;
       gap: 10px;
-      flex-shrink: 0;
-      background: linear-gradient(180deg, transparent, rgba(79,70,229,0.04));
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      box-shadow: 0 8px 28px rgba(20,20,30,0.12), 0 1px 3px rgba(20,20,30,0.06);
+      transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+    }
+    #authorCard:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 36px rgba(20,20,30,0.16), 0 2px 6px rgba(20,20,30,0.08);
     }
     #authorCard .author-glyph {
-      width: 32px; height: 32px;
+      width: 30px; height: 30px;
       border-radius: 50%;
       background: linear-gradient(135deg, var(--accent), var(--accent2));
       color: #fff;
-      font: 700 16px/1 'SF Mono','Menlo',monospace;
+      font: 700 15px/1 'SF Mono','Menlo',monospace;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(79,70,229,0.3);
     }
-    #authorCard .author-text { flex: 1; min-width: 0; }
+    #authorCard .author-text { display: flex; flex-direction: column; min-width: 0; }
     #authorCard .author-name {
       font: 600 12px/1.2 inherit;
       color: var(--text);
@@ -234,14 +247,16 @@
     }
     #authorCard .author-socials {
       display: flex;
-      gap: 4px;
+      gap: 3px;
       flex-shrink: 0;
+      padding-left: 6px;
+      margin-left: 4px;
+      border-left: 1px solid var(--border);
     }
     #authorCard .author-socials a {
-      width: 22px; height: 22px;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-      background: var(--sidebar);
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: transparent;
       color: var(--label);
       display: flex; align-items: center; justify-content: center;
       text-decoration: none;
@@ -249,11 +264,15 @@
       transition: all 0.15s;
     }
     #authorCard .author-socials a:hover {
-      border-color: var(--accent);
+      background: var(--panel);
       color: var(--accent);
-      transform: translateY(-1px);
     }
     #authorCard .author-socials a svg { display: block; }
+    /* Hide author card on very small screens to avoid covering canvas */
+    @media (max-width: 900px) {
+      #authorCard { bottom: 10px; right: 10px; padding: 6px 10px 6px 6px; }
+      #authorCard .author-text { display: none; }
+    }
 
     /* Newsletter modal */
     .modal-backdrop {
@@ -492,6 +511,7 @@
       flex-direction: column;
       background: var(--bg);
       overflow: hidden;
+      position: relative;  /* anchor for floating #authorCard */
     }
 
     #canvasToolbar {
@@ -1046,21 +1066,6 @@
     <span class="kbd">←</span> <span class="kbd">→</span> scrub
   </div>
 
-  <!-- Author / socials card -->
-  <div id="authorCard">
-    <div class="author-glyph">⠿</div>
-    <div class="author-text">
-      <div class="author-name">Yash Saindane</div>
-      <div class="author-role">Built ASCII Studio · 2026</div>
-    </div>
-    <div class="author-socials">
-      <a href="https://x.com/yashsaindane" target="_blank" rel="noopener" title="X / Twitter" aria-label="X">𝕏</a>
-      <a href="https://github.com/yashsaindane" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-      </a>
-      <a href="https://linkedin.com/in/yashsaindane" target="_blank" rel="noopener" title="LinkedIn" aria-label="LinkedIn">in</a>
-    </div>
-  </div>
 </aside>
 
 <!-- ── Newsletter Modal ──────────────────────────────────────────────────── -->
@@ -1114,6 +1119,22 @@
     <button id="playBtn">▶</button>
     <input type="range" id="frameSlider" min="0" max="0" step="1" value="0" />
     <span id="frameLabel">0 / 0</span>
+  </div>
+
+  <!-- Author / socials card (floating bottom-right) -->
+  <div id="authorCard">
+    <div class="author-glyph">⠿</div>
+    <div class="author-text">
+      <div class="author-name">Yash Saindane</div>
+      <div class="author-role">Built ASCII Studio · 2026</div>
+    </div>
+    <div class="author-socials">
+      <a href="https://x.com/yashsaindane" target="_blank" rel="noopener" title="X / Twitter" aria-label="X">𝕏</a>
+      <a href="https://github.com/yashsaindane" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+      <a href="https://linkedin.com/in/yashsaindane" target="_blank" rel="noopener" title="LinkedIn" aria-label="LinkedIn">in</a>
+    </div>
   </div>
 
 </main>
