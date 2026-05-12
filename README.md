@@ -112,9 +112,9 @@ asciify/
 ## Author
 
 **Yash Saindane**
-- 𝕏 / Twitter: [@yashsaindane](https://x.com/yashsaindane)
-- GitHub: [@yashsaindane](https://github.com/chimmichangaaas)
-- LinkedIn: [yashsaindane](https://linkedin.com/in/yashsaindane)
+- 𝕏 / Twitter: [@saindane_](https://x.com/saindane_)
+- GitHub: [@saindane_](https://github.com/chimmichangaaas)
+- LinkedIn: [yashsaindane](https://linkedin.com/in/hi-yash)
 
 If you ship something cool with Asciify, tag me — I'd love to see it.
 

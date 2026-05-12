@@ -38,10 +38,11 @@ async function syncOgImage() {
       console.warn('  Could not regenerate og-image.png:', err.message);
     }
   }
-  // Copy PNG (+ SVG fallback) into dist/docs
+  // Copy PNG (+ SVG fallback + default-preview AVIF) into dist/docs
   try {
-    await exec('cp', [png,                            resolve(ROOT, 'dist/docs/og-image.png')]);
-    await exec('cp', [resolve(ROOT, 'docs/og-image.svg'), resolve(ROOT, 'dist/docs/og-image.svg')]);
+    await exec('cp', [png,                                       resolve(ROOT, 'dist/docs/og-image.png')]);
+    await exec('cp', [resolve(ROOT, 'docs/og-image.svg'),        resolve(ROOT, 'dist/docs/og-image.svg')]);
+    await exec('cp', [resolve(ROOT, 'docs/preview-default.avif'),resolve(ROOT, 'dist/docs/preview-default.avif')]);
   } catch {}
 }
 await syncOgImage();

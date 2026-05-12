@@ -48,7 +48,7 @@ import { GIFEncoder, quantize, applyPalette } from 'gifenc';
     console.log(
       '%cThis is a closed-source tool by Yash Saindane.\n' +
       'If you copy this code you will be reported under copyright law.\n\n' +
-      'Want to use it commercially or partner?\n→ https://x.com/yashsaindane',
+      'Want to use it commercially or partner?\n→ https://x.com/saindane_',
       small,
     );
     // Override console.log/etc. to deter automated scraping
@@ -966,7 +966,7 @@ document.querySelectorAll<HTMLButtonElement>('.share-social').forEach(btn => {
   btn.addEventListener('click', () => {
     const net = btn.dataset.net!;
     const url = encodeURIComponent(shareLinkInput.value);
-    const text = encodeURIComponent('Just made some ASCII art with Asciify by @yashsaindane');
+    const text = encodeURIComponent('Just made some ASCII art with Asciify by @saindane_');
     let target = '';
     switch (net) {
       case 'x':        target = `https://twitter.com/intent/tweet?text=${text}&url=${url}`; break;
@@ -3681,4 +3681,26 @@ window.addEventListener('drop', e => {
       hide();
     }
   });
+})();
+
+// ── Default preview — load a sample image so the canvas isn't empty on first boot ──
+(async function loadDefaultPreview() {
+  // If a shared URL hash already has settings + the user has a file, this won't conflict
+  // since loadFile() replaces state. Skip if user already loaded something fast.
+  if (rawFrames.length > 0) return;
+  try {
+    const res = await fetch('docs/preview-default.avif', { cache: 'force-cache' });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    // Wrap as a File so it goes through the same drop pipeline
+    const file = new File([blob], 'preview-default.avif', { type: blob.type || 'image/avif' });
+    // Only auto-load if user still hasn't dropped anything (re-check after async fetch)
+    if (rawFrames.length === 0) {
+      await loadFile(file);
+      // Tag the status so users know it's a sample
+      setStatus('Sample preview — drop your own image to replace', '');
+    }
+  } catch {
+    // Network blocked / file missing → quietly skip (drop zone still works)
+  }
 })();
