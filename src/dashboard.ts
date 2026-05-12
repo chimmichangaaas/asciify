@@ -187,6 +187,15 @@ const hoverRadiusSlider = $<HTMLInputElement>('hoverRadiusSlider');
 const hoverRadiusVal   = $('hoverRadiusVal');
 const hoverStrengthSlider = $<HTMLInputElement>('hoverStrengthSlider');
 const hoverStrengthVal = $('hoverStrengthVal');
+const hoverSmoothSlider = $<HTMLInputElement>('hoverSmoothSlider');
+const hoverSmoothVal    = $('hoverSmoothVal');
+const hoverSpeedSlider  = $<HTMLInputElement>('hoverSpeedSlider');
+const hoverSpeedVal     = $('hoverSpeedVal');
+const hoverFalloffSelect= $<HTMLSelectElement>('hoverFalloffSelect');
+const hoverColorToggle  = $('hoverColorToggle');
+const hoverColorRow     = $('hoverColorRow');
+const hoverColorInput   = $<HTMLInputElement>('hoverColorInput');
+const hoverIdleToggle   = $('hoverIdleToggle');
 
 // Compare
 const compareWrap      = $('compareWrap');
@@ -258,6 +267,12 @@ const S = {
     | 'spotlight' | 'comet' | 'glitch' | 'particles' | 'tilt',
   hoverRadius:   5,
   hoverStrength: 60,
+  hoverSmooth:   22,      // cursor lag % (5 = very smooth/laggy, 100 = instant)
+  hoverSpeed:    1.0,     // animation speed multiplier (0.2 - 3.0)
+  hoverFalloff:  'smoothstep' as 'smoothstep'|'linear'|'exp'|'quad'|'step',
+  hoverUseColor: false,   // override default colors with custom
+  hoverColor:    '#4f46e5',
+  hoverIdle:     true,    // keep animating when cursor isn't moving
 };
 
 // Mask state
@@ -322,6 +337,21 @@ let hoverActive   = false;
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
+}
+
+// Compute proximity 0..1 from distance + radius using the user-selected falloff curve.
+// 0 = at radius edge (no effect), 1 = at cursor (max effect).
+function proxFromDist(distPx: number, radiusPx: number): number {
+  if (distPx >= radiusPx) return 0;
+  const linear = 1 - distPx / radiusPx;
+  switch (S.hoverFalloff) {
+    case 'linear':     return linear;
+    case 'quad':       return linear * linear;
+    case 'exp':        return Math.exp(-distPx * distPx / (radiusPx * radiusPx * 0.5));
+    case 'step':       return linear > 0.4 ? 1 : (linear > 0.1 ? 0.5 : 0);
+    case 'smoothstep':
+    default:           return smoothstep(radiusPx, 0, distPx);
+  }
 }
 // Comet trail: last N cursor positions with timestamps
 const cometTrail: Array<{ x: number; y: number; t: number }> = [];
@@ -586,8 +616,26 @@ hoverModeSelect.addEventListener('change', () => {
   if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
   else renderFrame(currentFrame);
 });
-makeSlider(hoverRadiusSlider,   hoverRadiusVal,   v => `${v}`,  v => { S.hoverRadius = v; });
-makeSlider(hoverStrengthSlider, hoverStrengthVal, v => `${v}%`, v => { S.hoverStrength = v; });
+makeSlider(hoverRadiusSlider,   hoverRadiusVal,   v => `${v}`,        v => { S.hoverRadius = v; });
+makeSlider(hoverStrengthSlider, hoverStrengthVal, v => `${v}%`,       v => { S.hoverStrength = v; });
+makeSlider(hoverSmoothSlider,   hoverSmoothVal,   v => `${v}%`,       v => { S.hoverSmooth = v; });
+makeSlider(hoverSpeedSlider,    hoverSpeedVal,    v => `${v.toFixed(1)}×`, v => { S.hoverSpeed = v; });
+
+hoverFalloffSelect.addEventListener('change', () => {
+  S.hoverFalloff = hoverFalloffSelect.value as typeof S.hoverFalloff;
+  if (hoverActive) {
+    if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+    else renderFrame(currentFrame);
+  }
+});
+
+makeToggle(hoverColorToggle, false, v => {
+  S.hoverUseColor = v;
+  hoverColorRow.style.display = v ? 'flex' : 'none';
+});
+hoverColorInput.addEventListener('input', () => { S.hoverColor = hoverColorInput.value; });
+
+makeToggle(hoverIdleToggle, true, v => { S.hoverIdle = v; });
 
 makeSlider(scanlinesSlider, scanlinesVal, v => `${v}%`, v => {
   S.scanlines = v;
@@ -1371,10 +1419,18 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
   const cols      = lines.reduce((m, l) => Math.max(m, l.length), 0);
   const radius    = S.hoverRadius;
   const strength  = S.hoverStrength / 100;
-  const t         = performance.now() * 0.001;
-  const cursorX   = hoverPxSm.x;          // pixel-space cursor
+  const speed     = S.hoverSpeed;                            // animation speed multiplier
+  const t         = performance.now() * 0.001 * speed;       // time scaled by user speed
+  const cursorX   = hoverPxSm.x;
   const cursorY   = hoverPxSm.y;
   const radiusPx  = radius * CELL;
+  // Custom accent color: if enabled, parse hex to RGB; else use theme defaults
+  const useCustom = S.hoverUseColor;
+  const customHex = S.hoverColor;
+  const [cR, cG, cB] = useCustom ? hexToRgb(customHex) : [217, 70, 239];      // magenta default
+  const [c2R, c2G, c2B] = useCustom ? hexToRgb(customHex) : [168, 85, 247];  // violet secondary
+  const accentColor   = useCustom ? customHex : '#a855f7';
+  const accent2Color  = useCustom ? customHex : '#d946ef';
 
   // ── Whole-canvas effects (early-return, don't do per-cell loop) ────────────
 
@@ -1444,7 +1500,7 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
         const cellCy = row * CELL + CELL / 2;
         const dist = Math.hypot(cellCx - cursorX, cellCy - cursorY);
         if (dist > radiusPx * 0.7) continue;
-        const prox = smoothstep(radiusPx * 0.7, 0, dist);
+        const prox = proxFromDist(dist, radiusPx * 0.7);
         c.save();
         c.shadowColor = '#d946ef';
         c.shadowBlur = 10 * prox;
@@ -1526,8 +1582,8 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       const distPx = Math.hypot(dxPx, dyPx);
       if (distPx > radiusPx) continue;
 
-      // Smooth falloff — feels much more natural than linear
-      const proximity = smoothstep(radiusPx, 0, distPx);
+      // User-selected falloff curve
+      const proximity = proxFromDist(distPx, radiusPx);
       if (proximity < 0.005) continue;
 
       const o = (row * frame.columns + col) * 3;
@@ -1615,7 +1671,7 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
           const nx = cursorX + Math.cos(ang0 + angDelta) * newDist;
           const ny = cursorY + Math.sin(ang0 + angDelta) * newDist;
           c.save();
-          c.shadowColor = '#a855f7';
+          c.shadowColor = accentColor;
           c.shadowBlur = 5 * proximity;
           c.fillStyle = themedStyle;
           c.fillText(glyph, nx - CELL / 2, ny - CELL / 2);
@@ -1627,7 +1683,7 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
           const lift = -strength * proximity * 5;
           const sway = Math.sin(t * 1.8 + col * 0.4 + row * 0.25) * proximity * 1.5;
           c.save();
-          c.shadowColor = '#d946ef';
+          c.shadowColor = accent2Color;
           c.shadowBlur = 4 * proximity;
           c.fillStyle = themedStyle;
           c.fillText(glyph, cellX + sway, cellY + lift);
@@ -1673,18 +1729,22 @@ function startHoverLoop() {
       hoverRaf = null;
       return;
     }
-    // Smooth cursor toward actual position (lower factor = more lag = smoother)
-    const SMOOTH = 0.22;
+    // User-controlled smoothing factor (5 = very lazy follow, 100 = instant)
+    const SMOOTH = S.hoverSmooth / 100;
     const prevX = hoverPxSm.x;
     const prevY = hoverPxSm.y;
     hoverPxSm.x += (hoverPx.x - hoverPxSm.x) * SMOOTH;
     hoverPxSm.y += (hoverPx.y - hoverPxSm.y) * SMOOTH;
-    // Track velocity (low-pass filtered) so dynamic effects can react to mouse speed
     const v = Math.hypot(hoverPxSm.x - prevX, hoverPxSm.y - prevY);
     hoverVel += (v - hoverVel) * 0.3;
 
-    if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
-    else renderFrame(currentFrame);
+    // If 'idle' is OFF and cursor has barely moved + effect isn't animated-by-time,
+    // skip redraw to save CPU when the user wants the effect to settle.
+    const TIMED_MODES = new Set(['wave', 'glitch', 'comet', 'particles', 'vortex', 'levitate']);
+    if (S.hoverIdle || TIMED_MODES.has(S.hoverMode) || v > 0.05) {
+      if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+      else renderFrame(currentFrame);
+    }
 
     hoverRaf = requestAnimationFrame(tick);
   };
