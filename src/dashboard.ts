@@ -1447,13 +1447,14 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
   const cursorX   = hoverPxSm.x;
   const cursorY   = hoverPxSm.y;
   const radiusPx  = radius * CELL;
-  // Custom accent color: if enabled, parse hex to RGB; else use theme defaults
+  // Custom accent color: if enabled, parse hex to RGB; else use NEUTRAL WHITE
+  // (no purple tint — hover effects stay clean unless user explicitly picks a color)
   const useCustom = S.hoverUseColor;
   const customHex = S.hoverColor;
-  const [cR, cG, cB] = useCustom ? hexToRgb(customHex) : [217, 70, 239];      // magenta default
-  const [c2R, c2G, c2B] = useCustom ? hexToRgb(customHex) : [168, 85, 247];  // violet secondary
-  const accentColor   = useCustom ? customHex : '#a855f7';
-  const accent2Color  = useCustom ? customHex : '#d946ef';
+  const [cR, cG, cB]    = useCustom ? hexToRgb(customHex) : [255, 255, 255];  // primary highlight
+  const [c2R, c2G, c2B] = useCustom ? hexToRgb(customHex) : [220, 220, 230];  // soft secondary
+  const accentColor   = useCustom ? customHex : '#ffffff';
+  const accent2Color  = useCustom ? customHex : '#e0e0e8';
 
   // ── Whole-canvas effects (early-return, don't do per-cell loop) ────────────
 
@@ -1535,9 +1536,9 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       const idxFade = i / cometTrail.length;   // newer points stronger
       const size = (10 + idxFade * 18) * Math.sqrt(fade) * strength;
       const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3.2);
-      g.addColorStop(0,    `rgba(217,70,239,${0.55 * fade})`);
-      g.addColorStop(0.4,  `rgba(168,85,247,${0.22 * fade})`);
-      g.addColorStop(1,    'rgba(168,85,247,0)');
+      g.addColorStop(0,    `rgba(${cR},${cG},${cB},${0.55 * fade})`);
+      g.addColorStop(0.4,  `rgba(${c2R},${c2G},${c2B},${0.22 * fade})`);
+      g.addColorStop(1,    `rgba(${c2R},${c2G},${c2B},0)`);
       c.fillStyle = g;
       c.fillRect(p.x - size * 3, p.y - size * 3, size * 6, size * 6);
       // Hot white core only on the freshest 6 samples
@@ -1560,9 +1561,9 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
         if (dist > radiusPx * 0.7) continue;
         const prox = proxFromDist(dist, radiusPx * 0.7);
         c.save();
-        c.shadowColor = '#d946ef';
+        c.shadowColor = accent2Color;
         c.shadowBlur = 10 * prox;
-        c.fillStyle = `rgba(255,${235 - prox * 40},${255 - prox * 70},${0.6 + prox * 0.4})`;
+        c.fillStyle = `rgba(255,255,255,${0.6 + prox * 0.4})`;
         c.fillText(glyph, col * CELL, row * CELL);
         c.restore();
       }
@@ -1587,7 +1588,7 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
         life: 0,
         maxLife: 1.4 + Math.random() * 1.4,
         size: kind === 'star' ? 3 + Math.random() * 2 : kind === 'spark' ? 1 + Math.random() : 1.5 + Math.random() * 2.8,
-        hue: useCustom ? 0 : 270 + Math.random() * 70,
+        hue: useCustom ? 0 : 0,   // hue is unused unless useCustom is on; particles default to white
         kind,
       });
     }
@@ -1614,39 +1615,34 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       const fade  = 1 - p.life / p.maxLife;
       const alpha = fade * fade;
 
-      // Color: hsla based on hue, OR custom hex
-      const baseColor = useCustom
-        ? `rgba(${cR},${cG},${cB},`
-        : `hsla(${p.hue},92%,`;
+      // Color: white-neutral by default, OR custom hex when toggle is on
+      const rgbBase = useCustom ? `${cR},${cG},${cB}` : `255,255,255`;
+      const glowEdge = useCustom ? `${cR},${cG},${cB}` : `225,225,235`;
 
       if (p.kind === 'star') {
         // 4-point star drawn as a "+" cross with glow
         const r = p.size * (1 + (1 - fade) * 0.5);
         c.save();
         c.translate(p.x, p.y);
-        c.rotate(p.life * 2); // slow rotation
-        // Outer glow
+        c.rotate(p.life * 2);
         const g = c.createRadialGradient(0, 0, 0, 0, 0, r * 4);
-        if (useCustom) g.addColorStop(0, `${baseColor}${alpha * 0.9})`);
-        else            g.addColorStop(0, `${baseColor}75%,${alpha * 0.9})`);
-        g.addColorStop(1, useCustom ? `${baseColor}0)` : `${baseColor}55%,0)`);
+        g.addColorStop(0, `rgba(${rgbBase},${alpha * 0.9})`);
+        g.addColorStop(1, `rgba(${glowEdge},0)`);
         c.fillStyle = g;
         c.fillRect(-r * 4, -r * 4, r * 8, r * 8);
-        // Star shape — long thin cross
         c.fillStyle = `rgba(255,255,255,${alpha})`;
         c.fillRect(-r * 2, -0.5, r * 4, 1);
         c.fillRect(-0.5, -r * 2, 1, r * 4);
         c.restore();
       } else if (p.kind === 'spark') {
-        // Tiny bright streak (oriented along velocity)
         const ang = Math.atan2(p.vy, p.vx);
         const len = 6 + Math.hypot(p.vx, p.vy) * 2;
         c.save();
         c.translate(p.x, p.y);
         c.rotate(ang);
-        c.strokeStyle = useCustom ? `${baseColor}${alpha})` : `${baseColor}80%,${alpha})`;
+        c.strokeStyle = `rgba(${rgbBase},${alpha})`;
         c.lineWidth = 1.2;
-        c.shadowColor = useCustom ? S.hoverColor : `hsl(${p.hue},92%,70%)`;
+        c.shadowColor = useCustom ? S.hoverColor : '#ffffff';
         c.shadowBlur = 4;
         c.beginPath();
         c.moveTo(-len * 0.6, 0);
@@ -1654,18 +1650,11 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
         c.stroke();
         c.restore();
       } else {
-        // Original soft dot
         const r2 = p.size * (1 + (1 - fade) * 1.2);
         const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r2 * 3.4);
-        if (useCustom) {
-          g.addColorStop(0,    `${baseColor}${alpha})`);
-          g.addColorStop(0.45, `${baseColor}${alpha * 0.4})`);
-          g.addColorStop(1,    `${baseColor}0)`);
-        } else {
-          g.addColorStop(0,    `${baseColor}75%,${alpha})`);
-          g.addColorStop(0.45, `${baseColor}60%,${alpha * 0.4})`);
-          g.addColorStop(1,    `${baseColor}55%,0)`);
-        }
+        g.addColorStop(0,    `rgba(${rgbBase},${alpha})`);
+        g.addColorStop(0.45, `rgba(${rgbBase},${alpha * 0.4})`);
+        g.addColorStop(1,    `rgba(${glowEdge},0)`);
         c.fillStyle = g;
         c.fillRect(p.x - r2 * 3.4, p.y - r2 * 3.4, r2 * 6.8, r2 * 6.8);
       }
@@ -1687,16 +1676,17 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       const blobY   = cursorY + Math.sin(phase * 0.9) * orbR;
       const breath  = 0.85 + Math.sin(t * 2 + i) * 0.15;
       const r       = radiusPx * (0.55 + i * 0.12) * strength * breath;
-      const hue     = useCustom ? 0 : (260 + i * 35 + t * 12) % 360;
-      const blob    = c.createRadialGradient(blobX, blobY, 0, blobX, blobY, r);
+      const blob = c.createRadialGradient(blobX, blobY, 0, blobX, blobY, r);
       if (useCustom) {
         blob.addColorStop(0,    `rgba(${cR},${cG},${cB},0.55)`);
         blob.addColorStop(0.5,  `rgba(${cR},${cG},${cB},0.15)`);
         blob.addColorStop(1,    `rgba(${cR},${cG},${cB},0)`);
       } else {
-        blob.addColorStop(0,    `hsla(${hue}, 85%, 65%, 0.55)`);
-        blob.addColorStop(0.5,  `hsla(${hue}, 85%, 55%, 0.15)`);
-        blob.addColorStop(1,    `hsla(${hue}, 85%, 55%, 0)`);
+        // Neutral white blobs with subtle alpha variation per layer (no hue cycling)
+        const alpha = 0.45 - i * 0.08;
+        blob.addColorStop(0,    `rgba(255,255,255,${alpha})`);
+        blob.addColorStop(0.5,  `rgba(245,245,250,${alpha * 0.3})`);
+        blob.addColorStop(1,    `rgba(230,230,240,0)`);
       }
       c.fillStyle = blob;
       c.fillRect(0, 0, cw, ch);
@@ -1812,7 +1802,6 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
     c.globalCompositeOperation = 'screen';
     const layers = 4;
     for (let layer = 0; layer < layers; layer++) {
-      const hue = useCustom ? 0 : (220 + layer * 50 + t * 18) % 360;
       const freq = 0.012 + layer * 0.004;
       const amp  = 60 + layer * 25;
       const phase = t * 0.6 + layer * 1.7;
@@ -1835,9 +1824,11 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
         grad.addColorStop(0.5, `rgba(${cR},${cG},${cB},${0.12 - layer * 0.02})`);
         grad.addColorStop(1,   `rgba(${cR},${cG},${cB},0)`);
       } else {
-        grad.addColorStop(0,   `hsla(${hue}, 80%, 55%, 0)`);
-        grad.addColorStop(0.5, `hsla(${hue}, 80%, 55%, ${0.18 - layer * 0.03})`);
-        grad.addColorStop(1,   `hsla(${(hue + 30) % 360}, 80%, 55%, 0)`);
+        // Neutral white ribbons — alpha-driven layering, no hue
+        const a = 0.18 - layer * 0.03;
+        grad.addColorStop(0,   `rgba(255,255,255,0)`);
+        grad.addColorStop(0.5, `rgba(255,255,255,${a})`);
+        grad.addColorStop(1,   `rgba(235,235,245,0)`);
       }
       c.fillStyle = grad;
       c.fill();
@@ -2197,9 +2188,10 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
           const offY = Math.cos(stepSeed * 0.7) * proximity * 0.8;
           c.save();
           c.globalCompositeOperation = 'screen';
-          c.fillStyle = `rgba(217,70,239,${0.5 * proximity + 0.1})`;
+          // Subtle RGB-shift using neutral red/cyan (not purple) — classic chromatic-aberration look
+          c.fillStyle = `rgba(255,80,80,${0.5 * proximity + 0.1})`;
           c.fillText(glitchGlyph, cellX + offX - 1, cellY + offY);
-          c.fillStyle = `rgba(0,200,255,${0.4 * proximity + 0.1})`;
+          c.fillStyle = `rgba(80,220,255,${0.4 * proximity + 0.1})`;
           c.fillText(glitchGlyph, cellX + offX + 1, cellY + offY);
           c.fillStyle = themedStyle;
           c.fillText(glitchGlyph, cellX + offX, cellY + offY);
