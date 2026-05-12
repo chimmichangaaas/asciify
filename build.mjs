@@ -119,7 +119,9 @@ async function writeDashHtml() {
   const shell = await readFile(resolve(ROOT, 'src/dashboard.html'), 'utf8');
   const html = minifyHtml(shell.replace('<!-- SCRIPT -->', `<script>${js}</script>`));
   await writeFile(resolve(ROOT, 'dist/dashboard.html'), html);
-  console.log('  dist/dashboard.html', `(${(html.length / 1024).toFixed(1)} KB${PROD ? ', minified' : ''})`);
+  // Also write index.html so static hosts (GitHub Pages, Vercel, Netlify) work out-of-the-box
+  await writeFile(resolve(ROOT, 'dist/index.html'), html);
+  console.log('  dist/index.html + dist/dashboard.html', `(${(html.length / 1024).toFixed(1)} KB${PROD ? ', minified' : ''})`);
 }
 
 if (WATCH) {
