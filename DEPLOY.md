@@ -161,22 +161,22 @@ That's it. GitHub Actions (for Pages) or Vercel (for Vercel) will rebuild and re
 
 ## 🖼 Step 5 — Fix the preview thumbnail URL (do this AFTER first deploy)
 
-The Open Graph meta tags in `src/dashboard.html` are currently pointing to `https://yashsaindane.github.io/asciify/`. If your URL is different (e.g. a Vercel URL or custom domain), the preview won't load right when shared.
+The Open Graph meta tags in `src/dashboard.html` are currently pointing to `https://chimmichangaaas.github.io/asciify/`. If your URL is different (e.g. a Vercel URL or custom domain), the preview won't load right when shared.
 
 ### Quick fix
-Open `src/dashboard.html` and find these lines near the top (search for `yashsaindane.github.io`):
+Open `src/dashboard.html` and find these lines near the top (search for `chimmichangaaas.github.io`):
 
 ```html
-<meta property="og:url" content="https://yashsaindane.github.io/asciify/" />
-<meta property="og:image" content="https://yashsaindane.github.io/asciify/docs/og-image.png" />
-<meta property="og:image:secure_url" content="https://yashsaindane.github.io/asciify/docs/og-image.png" />
-<meta name="twitter:image" content="https://yashsaindane.github.io/asciify/docs/og-image.png" />
-<link rel="canonical" href="https://yashsaindane.github.io/asciify/" />
-<meta property="og:image:secure_url" content="https://yashsaindane.github.io/asciify/docs/og-image.png" />
-<link rel="image_src" href="https://yashsaindane.github.io/asciify/docs/og-image.png" />
+<meta property="og:url" content="https://chimmichangaaas.github.io/asciify/" />
+<meta property="og:image" content="https://chimmichangaaas.github.io/asciify/docs/og-image.png" />
+<meta property="og:image:secure_url" content="https://chimmichangaaas.github.io/asciify/docs/og-image.png" />
+<meta name="twitter:image" content="https://chimmichangaaas.github.io/asciify/docs/og-image.png" />
+<link rel="canonical" href="https://chimmichangaaas.github.io/asciify/" />
+<meta property="og:image:secure_url" content="https://chimmichangaaas.github.io/asciify/docs/og-image.png" />
+<link rel="image_src" href="https://chimmichangaaas.github.io/asciify/docs/og-image.png" />
 ```
 
-Replace `https://yashsaindane.github.io/asciify/` with your actual live URL, save, commit, push.
+Replace `https://chimmichangaaas.github.io/asciify/` with your actual live URL, save, commit, push.
 
 Same goes for the share URL helper in `src/dashboard.ts` — search for `PUBLIC_URL` and update it.
 

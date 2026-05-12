@@ -5,10 +5,10 @@
   "description": "Asciify — turn images, GIFs and videos into typographic art. Standalone web dashboard plus a Figma plugin.",
   "author": "Yash Saindane",
   "license": "UNLICENSED",
-  "homepage": "https://github.com/yashsaindane/asciify",
+  "homepage": "https://github.com/chimmichangaaas/asciify",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yashsaindane/asciify.git"
+    "url": "https://github.com/chimmichangaaas/asciify.git"
   },
   "scripts": {
     "dev":       "node build.mjs --watch",

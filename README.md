@@ -113,7 +113,7 @@ asciify/
 
 **Yash Saindane**
 - 𝕏 / Twitter: [@yashsaindane](https://x.com/yashsaindane)
-- GitHub: [@yashsaindane](https://github.com/yashsaindane)
+- GitHub: [@yashsaindane](https://github.com/chimmichangaaas)
 - LinkedIn: [yashsaindane](https://linkedin.com/in/yashsaindane)
 
 If you ship something cool with Asciify, tag me — I'd love to see it.

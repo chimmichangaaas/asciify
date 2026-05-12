@@ -913,7 +913,7 @@ window.addEventListener('mousemove', e => {
 // Public URL where the dashboard is hosted. When the page is opened over file://
 // (i.e. running locally), shared links won't work for OG previews, so we fall
 // back to this canonical URL so previews still render correctly when posted.
-const PUBLIC_URL = 'https://yashsaindane.github.io/asciify/';
+const PUBLIC_URL = 'https://chimmichangaaas.github.io/asciify/';
 
 function buildShareUrl(): string {
   const state = { S, M: { ...M, paintTimings: M.paintTimings ? Array.from(M.paintTimings.entries()) : null } };
@@ -3153,7 +3153,7 @@ btnHtmlInteractive.addEventListener('click', () => {
 </head>
 <body>
   <div class="ascii" id="art" aria-label="Interactive ASCII art">${spans}</div>
-  <div class="signature">made with <a href="https://yashsaindane.github.io/asciify/" target="_blank">Asciify</a></div>
+  <div class="signature">made with <a href="https://chimmichangaaas.github.io/asciify/" target="_blank">Asciify</a></div>
 <script>
 (function () {
   var art = document.getElementById('art');
