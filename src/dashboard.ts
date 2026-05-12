@@ -444,11 +444,6 @@ const PRESETS: Record<string, Preset> = {
   bloom:   { M: { direction: 'radial-out', duration: 2.5, easing: 'out',    flipDuration: 0.7, waveAmount: 8,  edgeNoise: 0,  colorMode: 'fade-grey', vertJitter: 0 } },
   wave:    { M: { direction: 'lr',         duration: 2.5, easing: 'in-out', flipDuration: 0.6, waveAmount: 25, waveFreq: 6, edgeNoise: 5, colorMode: 'fade-grey', vertJitter: 0 } },
   shatter: { M: { direction: 'radial-in',  duration: 1.8, easing: 'in',     flipDuration: 0.4, waveAmount: 0,  edgeNoise: 30, colorMode: 'glitch', vertJitter: 6 } },
-  // Halftone print look — switches render mode + duotone purple/white theme
-  'halftone-print': {
-    M: { direction: 'lr', duration: 2.0, easing: 'in-out', flipDuration: 0.5, colorMode: 'fade-grey', vertJitter: 0, waveAmount: 0, edgeNoise: 0 },
-    S: { renderMode: 'halftone', theme: 'custom', themeFg: '#7c5cfc', themeBg: '#f4f4ff', invert: true, autoContrast: true },
-  },
 };
 
 presetRow.querySelectorAll<HTMLButtonElement>('.preset-chip').forEach(chip => {
