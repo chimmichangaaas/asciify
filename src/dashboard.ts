@@ -1975,16 +1975,6 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       }
     }
 
-    // 4. Subtle cursor ring so you always see where the brush is
-    c.save();
-    c.globalCompositeOperation = 'lighter';
-    const ring = c.createRadialGradient(cursorX, cursorY, radiusPx * 0.85, cursorX, cursorY, radiusPx * 1.05);
-    ring.addColorStop(0, `rgba(${cR},${cG},${cB},0)`);
-    ring.addColorStop(0.6, `rgba(${cR},${cG},${cB},0.18)`);
-    ring.addColorStop(1, `rgba(${cR},${cG},${cB},0)`);
-    c.fillStyle = ring;
-    c.fillRect(0, 0, cw, ch);
-    c.restore();
     return;
   }
 
@@ -2104,18 +2094,6 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       }
     }
 
-    // Subtle cursor halo so the user always sees where they're painting
-    if (S.hoverMode !== 'mask-reveal') {
-      c.save();
-      c.globalCompositeOperation = 'lighter';
-      const halo = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, radiusPx);
-      halo.addColorStop(0,    `rgba(${c2R},${c2G},${c2B},0.15)`);
-      halo.addColorStop(0.7,  `rgba(${c2R},${c2G},${c2B},0.04)`);
-      halo.addColorStop(1,    `rgba(${c2R},${c2G},${c2B},0)`);
-      c.fillStyle = halo;
-      c.fillRect(0, 0, cw, ch);
-      c.restore();
-    }
     return;
   }
 
