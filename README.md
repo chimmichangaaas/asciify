@@ -4,7 +4,17 @@
 > A standalone web dashboard with mask reveals, dither modes, themes, and one-click exports.
 
 <p align="center">
-  <img src="docs/hero.png" alt="Asciify preview" width="800" />
+  <a href="https://chimmichangaaas.github.io/asciify/">
+    <img src="docs/og-image.png" alt="Asciify — turn images into typographic art" width="800" />
+  </a>
+</p>
+
+<p align="center">
+  <img src="docs/preview-default.jpg" alt="Asciify preview" width="420" />
+</p>
+
+<p align="center">
+  <strong><a href="https://chimmichangaaas.github.io/asciify/">🚀 Try it live</a></strong>
 </p>
 
 ---
