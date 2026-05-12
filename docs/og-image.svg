@@ -1,68 +1,7 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"   stop-color="#000000"/>
-      <stop offset="100%" stop-color="#0e0b18"/>
-    </linearGradient>
-    <linearGradient id="titleGrad" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%"  stop-color="#ffffff"/>
-      <stop offset="60%" stop-color="#d8d2ff"/>
-      <stop offset="100%" stop-color="#b8a8e0"/>
-    </linearGradient>
-    <radialGradient id="vignette" cx="50%" cy="50%" r="75%">
-      <stop offset="0%"  stop-color="rgba(0,0,0,0)"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0.55)"/>
-    </radialGradient>
-  </defs>
+  <!-- Pure black background -->
+  <rect width="1200" height="630" fill="#000000"/>
 
-  <!-- Background -->
-  <rect width="1200" height="630" fill="url(#bg)"/>
-
-  <!-- Big eye logo on the left, vertically centered -->
-  <image href="logo.png" x="-30" y="-30" width="690" height="690" preserveAspectRatio="xMidYMid meet"/>
-
-  <!-- Right column: title + tagline + features + author -->
-  <g transform="translate(630, 0)">
-    <!-- Title -->
-    <text x="0" y="220" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif"
-          font-size="108" font-weight="800" fill="url(#titleGrad)" letter-spacing="-3">
-      Asciify
-    </text>
-
-    <!-- Tagline -->
-    <text x="4" y="270" font-family="-apple-system, 'Inter', sans-serif"
-          font-size="26" font-weight="500" fill="#a8a4cf">
-      Turn images into typographic art.
-    </text>
-
-    <!-- Feature pills (3 row) -->
-    <g font-family="-apple-system, 'Inter', sans-serif" font-size="13" font-weight="600">
-      <g transform="translate(4, 320)">
-        <rect x="0" y="0" width="120" height="30" rx="15" fill="rgba(168,164,255,0.12)" stroke="rgba(168,164,255,0.35)"/>
-        <text x="60" y="20" fill="#d8d2ff" text-anchor="middle">⚡ Mask reveals</text>
-      </g>
-      <g transform="translate(132, 320)">
-        <rect x="0" y="0" width="146" height="30" rx="15" fill="rgba(192,132,252,0.12)" stroke="rgba(192,132,252,0.35)"/>
-        <text x="73" y="20" fill="#e9d5ff" text-anchor="middle">🎨 6 render modes</text>
-      </g>
-      <g transform="translate(286, 320)">
-        <rect x="0" y="0" width="140" height="30" rx="15" fill="rgba(251,146,60,0.12)" stroke="rgba(251,146,60,0.35)"/>
-        <text x="70" y="20" fill="#fdba74" text-anchor="middle">📦 17+ exports</text>
-      </g>
-    </g>
-
-    <!-- Divider -->
-    <line x1="0" y1="450" x2="500" y2="450" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
-
-    <!-- Author -->
-    <text x="0" y="495" font-family="-apple-system, 'Inter', sans-serif" font-size="22" font-weight="500" fill="#a8a4cf">
-      Built by <tspan fill="#e9d5ff" font-weight="700">Yash Saindane</tspan>
-    </text>
-    <text x="0" y="525" font-family="'SF Mono','Menlo',monospace" font-size="15" fill="#7a749a">
-      @saindane_  ·  github.com/chimmichangaaas
-    </text>
-  </g>
-
-  <!-- Vignette overlay -->
-  <rect width="1200" height="630" fill="url(#vignette)" pointer-events="none"/>
+  <!-- Centered logo, generous breathing room -->
+  <image href="logo.png" x="345" y="60" width="510" height="510" preserveAspectRatio="xMidYMid meet"/>
 </svg>
