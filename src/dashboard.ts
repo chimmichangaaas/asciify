@@ -264,7 +264,8 @@ const S = {
   hoverMode:     'none' as
     | 'none' | 'glow' | 'scale' | 'invert'
     | 'magnet' | 'repel' | 'vortex' | 'wave' | 'levitate'
-    | 'spotlight' | 'comet' | 'glitch' | 'particles' | 'tilt',
+    | 'spotlight' | 'comet' | 'glitch' | 'particles' | 'tilt'
+    | 'plasma' | 'lens' | 'lightning' | 'shockwave' | 'aurora',
   hoverRadius:   5,
   hoverStrength: 60,
   hoverSmooth:   22,      // cursor lag % (5 = very smooth/laggy, 100 = instant)
@@ -355,9 +356,14 @@ function proxFromDist(distPx: number, radiusPx: number): number {
 }
 // Comet trail: last N cursor positions with timestamps
 const cometTrail: Array<{ x: number; y: number; t: number }> = [];
-// Particle system
-type Particle = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; size: number; hue: number };
+// Particle system — supports multiple visual types
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; size: number; hue: number; kind: 'dot' | 'star' | 'spark' };
 const particles:  Particle[] = [];
+// Shockwave ring state — spawned on velocity spikes
+const shockwaves: Array<{ x: number; y: number; t: number; maxR: number }> = [];
+// Lightning bolt segments cached briefly for stability
+type LightningBolt = { from: { x: number; y: number }; to: { x: number; y: number }; midpoints: Array<{ x: number; y: number }>; t: number };
+const lightningBolts: LightningBolt[] = [];
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
@@ -612,6 +618,8 @@ hoverModeSelect.addEventListener('change', () => {
   canvasEl.style.transform = `scale(${zoomPct / 100})`;
   cometTrail.length = 0;
   particles.length  = 0;
+  shockwaves.length = 0;
+  lightningBolts.length = 0;
   // Re-render to clear any previous hover state
   if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
   else renderFrame(currentFrame);
@@ -748,6 +756,8 @@ canvasEl.addEventListener('mouseleave', () => {
   hoverPxSm    = null;
   cometTrail.length = 0;
   particles.length  = 0;
+  shockwaves.length = 0;
+  lightningBolts.length = 0;
   if (hoverRaf !== null) { cancelAnimationFrame(hoverRaf); hoverRaf = null; }
   if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
   else renderFrame(currentFrame);
@@ -1435,8 +1445,8 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
   // ── Whole-canvas effects (early-return, don't do per-cell loop) ────────────
 
   if (S.hoverMode === 'spotlight') {
-    // Dim mask with smooth multi-stop gradient — feels softer than the previous hard 0.4/1.0
     const r = radiusPx;
+    // 1. Dim mask
     const grad = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 2.2);
     grad.addColorStop(0.00, 'rgba(0,0,0,0)');
     grad.addColorStop(0.30, 'rgba(0,0,0,0.10)');
@@ -1445,15 +1455,50 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
     grad.addColorStop(1.00, 'rgba(2,1,4,0.95)');
     c.fillStyle = grad;
     c.fillRect(0, 0, cw, ch);
-    // Inner bloom — soft violet halo, additive
+
+    // 2. Slowly rotating light rays — 6 conical wedges emanating from cursor
     c.save();
     c.globalCompositeOperation = 'lighter';
-    const halo = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 0.55);
-    halo.addColorStop(0.00, 'rgba(168,85,247,0.22)');
-    halo.addColorStop(0.55, 'rgba(168,85,247,0.06)');
-    halo.addColorStop(1.00, 'rgba(168,85,247,0)');
+    const rays = 6;
+    for (let i = 0; i < rays; i++) {
+      const ang = (i / rays) * Math.PI * 2 + t * 0.25;
+      const rayWidth = Math.PI * 0.12;
+      const reach = r * (1.6 + Math.sin(t * 0.8 + i) * 0.15);
+      c.beginPath();
+      c.moveTo(cursorX, cursorY);
+      c.arc(cursorX, cursorY, reach, ang - rayWidth, ang + rayWidth);
+      c.closePath();
+      const rayGrad = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, reach);
+      rayGrad.addColorStop(0,    `rgba(${c2R},${c2G},${c2B},0.0)`);
+      rayGrad.addColorStop(0.15, `rgba(${c2R},${c2G},${c2B},0.18)`);
+      rayGrad.addColorStop(1,    `rgba(${c2R},${c2G},${c2B},0.0)`);
+      c.fillStyle = rayGrad;
+      c.fill();
+    }
+    c.restore();
+
+    // 3. Inner soft halo
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    const halo = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 0.6);
+    halo.addColorStop(0.00, `rgba(${c2R},${c2G},${c2B},0.28)`);
+    halo.addColorStop(0.55, `rgba(${c2R},${c2G},${c2B},0.08)`);
+    halo.addColorStop(1.00, `rgba(${c2R},${c2G},${c2B},0)`);
     c.fillStyle = halo;
     c.fillRect(0, 0, cw, ch);
+
+    // 4. Dust motes drifting in the beam (8 small particles orbiting slowly)
+    for (let i = 0; i < 10; i++) {
+      const ang   = t * 0.5 + i * 0.7;
+      const orbR  = r * (0.25 + (i % 3) * 0.18);
+      const px    = cursorX + Math.cos(ang) * orbR + Math.sin(t * 0.3 + i) * 8;
+      const py    = cursorY + Math.sin(ang * 0.7) * orbR + Math.cos(t * 0.4 + i) * 6;
+      const size  = 1.2 + Math.sin(t * 2 + i) * 0.6;
+      c.fillStyle = `rgba(${cR},${cG},${cB},${0.5 + Math.sin(t + i) * 0.2})`;
+      c.beginPath();
+      c.arc(px, py, size, 0, Math.PI * 2);
+      c.fill();
+    }
     c.restore();
     return;
   }
@@ -1514,10 +1559,13 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
 
   if (S.hoverMode === 'particles') {
     // Emit count scales with cursor velocity (more particles when moving fast)
-    const emitCount = Math.min(5, 1 + Math.floor(hoverVel * 0.4));
+    const emitCount = Math.min(6, 1 + Math.floor(hoverVel * 0.5));
     for (let i = 0; i < emitCount; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 0.4 + Math.random() * (1.5 + hoverVel * 0.2);
+      // Pick a particle TYPE — 70% dot, 20% star, 10% spark
+      const r = Math.random();
+      const kind: Particle['kind'] = r < 0.7 ? 'dot' : r < 0.9 ? 'star' : 'spark';
       particles.push({
         x:  cursorX + (Math.random() - 0.5) * 4,
         y:  cursorY + (Math.random() - 0.5) * 4,
@@ -1525,8 +1573,9 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
         vy: Math.sin(angle) * speed - 0.4,
         life: 0,
         maxLife: 1.4 + Math.random() * 1.4,
-        size: 1.5 + Math.random() * 2.8,
-        hue: 270 + Math.random() * 70,
+        size: kind === 'star' ? 3 + Math.random() * 2 : kind === 'spark' ? 1 + Math.random() : 1.5 + Math.random() * 2.8,
+        hue: useCustom ? 0 : 270 + Math.random() * 70,
+        kind,
       });
     }
     c.save();
@@ -1549,19 +1598,314 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
         p.vy += (dyc / dc) * push;
       }
       if (p.life >= p.maxLife) { particles.splice(i, 1); continue; }
-      // Ease-out fade with quadratic curve
       const fade  = 1 - p.life / p.maxLife;
       const alpha = fade * fade;
-      const r = p.size * (1 + (1 - fade) * 1.2); // grow slightly as fading
-      const grad = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.4);
-      grad.addColorStop(0,    `hsla(${p.hue},92%,75%,${alpha})`);
-      grad.addColorStop(0.45, `hsla(${p.hue},92%,60%,${alpha * 0.4})`);
-      grad.addColorStop(1,    `hsla(${p.hue},92%,55%,0)`);
-      c.fillStyle = grad;
-      c.fillRect(p.x - r * 3.4, p.y - r * 3.4, r * 6.8, r * 6.8);
+
+      // Color: hsla based on hue, OR custom hex
+      const baseColor = useCustom
+        ? `rgba(${cR},${cG},${cB},`
+        : `hsla(${p.hue},92%,`;
+
+      if (p.kind === 'star') {
+        // 4-point star drawn as a "+" cross with glow
+        const r = p.size * (1 + (1 - fade) * 0.5);
+        c.save();
+        c.translate(p.x, p.y);
+        c.rotate(p.life * 2); // slow rotation
+        // Outer glow
+        const g = c.createRadialGradient(0, 0, 0, 0, 0, r * 4);
+        if (useCustom) g.addColorStop(0, `${baseColor}${alpha * 0.9})`);
+        else            g.addColorStop(0, `${baseColor}75%,${alpha * 0.9})`);
+        g.addColorStop(1, useCustom ? `${baseColor}0)` : `${baseColor}55%,0)`);
+        c.fillStyle = g;
+        c.fillRect(-r * 4, -r * 4, r * 8, r * 8);
+        // Star shape — long thin cross
+        c.fillStyle = `rgba(255,255,255,${alpha})`;
+        c.fillRect(-r * 2, -0.5, r * 4, 1);
+        c.fillRect(-0.5, -r * 2, 1, r * 4);
+        c.restore();
+      } else if (p.kind === 'spark') {
+        // Tiny bright streak (oriented along velocity)
+        const ang = Math.atan2(p.vy, p.vx);
+        const len = 6 + Math.hypot(p.vx, p.vy) * 2;
+        c.save();
+        c.translate(p.x, p.y);
+        c.rotate(ang);
+        c.strokeStyle = useCustom ? `${baseColor}${alpha})` : `${baseColor}80%,${alpha})`;
+        c.lineWidth = 1.2;
+        c.shadowColor = useCustom ? S.hoverColor : `hsl(${p.hue},92%,70%)`;
+        c.shadowBlur = 4;
+        c.beginPath();
+        c.moveTo(-len * 0.6, 0);
+        c.lineTo(len * 0.4, 0);
+        c.stroke();
+        c.restore();
+      } else {
+        // Original soft dot
+        const r2 = p.size * (1 + (1 - fade) * 1.2);
+        const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r2 * 3.4);
+        if (useCustom) {
+          g.addColorStop(0,    `${baseColor}${alpha})`);
+          g.addColorStop(0.45, `${baseColor}${alpha * 0.4})`);
+          g.addColorStop(1,    `${baseColor}0)`);
+        } else {
+          g.addColorStop(0,    `${baseColor}75%,${alpha})`);
+          g.addColorStop(0.45, `${baseColor}60%,${alpha * 0.4})`);
+          g.addColorStop(1,    `${baseColor}55%,0)`);
+        }
+        c.fillStyle = g;
+        c.fillRect(p.x - r2 * 3.4, p.y - r2 * 3.4, r2 * 6.8, r2 * 6.8);
+      }
     }
     if (particles.length > 140) particles.splice(0, particles.length - 140);
     c.restore();
+    return;
+  }
+
+  // ─── 🌀 Plasma — fluid blobs of color following cursor ────────────────────
+  if (S.hoverMode === 'plasma') {
+    c.save();
+    c.globalCompositeOperation = 'screen';
+    // 3 wobbling color blobs orbiting cursor at different phases
+    for (let i = 0; i < 3; i++) {
+      const phase   = t * (1 + i * 0.3) + i * 2.1;
+      const orbR    = radiusPx * 0.18 * strength;
+      const blobX   = cursorX + Math.cos(phase) * orbR;
+      const blobY   = cursorY + Math.sin(phase * 0.9) * orbR;
+      const breath  = 0.85 + Math.sin(t * 2 + i) * 0.15;
+      const r       = radiusPx * (0.55 + i * 0.12) * strength * breath;
+      const hue     = useCustom ? 0 : (260 + i * 35 + t * 12) % 360;
+      const blob    = c.createRadialGradient(blobX, blobY, 0, blobX, blobY, r);
+      if (useCustom) {
+        blob.addColorStop(0,    `rgba(${cR},${cG},${cB},0.55)`);
+        blob.addColorStop(0.5,  `rgba(${cR},${cG},${cB},0.15)`);
+        blob.addColorStop(1,    `rgba(${cR},${cG},${cB},0)`);
+      } else {
+        blob.addColorStop(0,    `hsla(${hue}, 85%, 65%, 0.55)`);
+        blob.addColorStop(0.5,  `hsla(${hue}, 85%, 55%, 0.15)`);
+        blob.addColorStop(1,    `hsla(${hue}, 85%, 55%, 0)`);
+      }
+      c.fillStyle = blob;
+      c.fillRect(0, 0, cw, ch);
+    }
+    c.restore();
+    // Distort nearby chars with a noise-based wobble in addition to glow
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < lines[row].length; col++) {
+        const glyph = lines[row][col];
+        if (glyph === ' ') continue;
+        const cellCx = col * CELL + CELL / 2;
+        const cellCy = row * CELL + CELL / 2;
+        const dPx = Math.hypot(cellCx - cursorX, cellCy - cursorY);
+        if (dPx > radiusPx) continue;
+        const prox = proxFromDist(dPx, radiusPx);
+        const wob  = Math.sin(t * 3 + col * 0.4 + row * 0.6) * prox * 3 * strength;
+        c.save();
+        c.shadowColor = accent2Color;
+        c.shadowBlur  = 10 * prox;
+        c.globalAlpha = 0.7 + prox * 0.3;
+        c.fillStyle = `rgba(255,255,255,${prox * 0.9})`;
+        c.fillText(glyph, col * CELL, row * CELL + wob);
+        c.restore();
+      }
+    }
+    return;
+  }
+
+  // ─── 💫 Shockwave — expanding rings spawn on cursor velocity spikes ──────
+  if (S.hoverMode === 'shockwave') {
+    // Spawn new ring when cursor moves fast enough (and don't double-spawn rapidly)
+    const last = shockwaves[shockwaves.length - 1];
+    const minGap = 0.10; // s
+    if (hoverVel > 0.9 && (!last || t - last.t > minGap)) {
+      shockwaves.push({ x: cursorX, y: cursorY, t, maxR: radiusPx * (1.5 + hoverVel * 0.05) });
+    }
+    // Render + age rings
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    for (let i = shockwaves.length - 1; i >= 0; i--) {
+      const r       = shockwaves[i];
+      const age     = (t - r.t) / 1.0;
+      if (age >= 1) { shockwaves.splice(i, 1); continue; }
+      const eased   = age * (2 - age);              // ease-out
+      const radius  = eased * r.maxR;
+      const alpha   = (1 - age) * (1 - age) * 0.85;
+      const width   = (1 - age) * 4 + 1;
+      // Outer halo
+      c.strokeStyle = `rgba(${c2R},${c2G},${c2B},${alpha * 0.5})`;
+      c.lineWidth = width * 3;
+      c.beginPath();
+      c.arc(r.x, r.y, radius, 0, Math.PI * 2);
+      c.stroke();
+      // Sharp ring
+      c.strokeStyle = `rgba(${cR},${cG},${cB},${alpha})`;
+      c.lineWidth = width;
+      c.beginPath();
+      c.arc(r.x, r.y, radius, 0, Math.PI * 2);
+      c.stroke();
+    }
+    c.restore();
+    // Chars near any ring frontier get pushed outward briefly + glow
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < lines[row].length; col++) {
+        const glyph = lines[row][col];
+        if (glyph === ' ') continue;
+        const cellCx = col * CELL + CELL / 2;
+        const cellCy = row * CELL + CELL / 2;
+        let pushAmt = 0;
+        let glow = 0;
+        for (const r of shockwaves) {
+          const age = (t - r.t) / 1.0;
+          if (age >= 1) continue;
+          const eased = age * (2 - age);
+          const ringR = eased * r.maxR;
+          const d = Math.hypot(cellCx - r.x, cellCy - r.y);
+          const distToRing = Math.abs(d - ringR);
+          if (distToRing < CELL * 2) {
+            const ringProx = 1 - distToRing / (CELL * 2);
+            const fade = 1 - age;
+            pushAmt = Math.max(pushAmt, ringProx * fade * strength * 6);
+            glow = Math.max(glow, ringProx * fade);
+          }
+        }
+        if (pushAmt > 0) {
+          // Find nearest ring + push direction
+          let best: typeof shockwaves[0] | null = null;
+          let bestD = Infinity;
+          for (const r of shockwaves) {
+            const d = Math.hypot(cellCx - r.x, cellCy - r.y);
+            if (d < bestD) { bestD = d; best = r; }
+          }
+          if (best) {
+            const dx = cellCx - best.x;
+            const dy = cellCy - best.y;
+            const d  = Math.hypot(dx, dy) || 1;
+            c.save();
+            c.shadowColor = accent2Color;
+            c.shadowBlur = 8 * glow;
+            c.fillStyle = `rgba(255,255,255,${0.7 + glow * 0.3})`;
+            c.fillText(glyph, col * CELL + (dx / d) * pushAmt, row * CELL + (dy / d) * pushAmt);
+            c.restore();
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  // ─── 🌌 Aurora — flowing color waves rippling across the canvas ──────────
+  if (S.hoverMode === 'aurora') {
+    c.save();
+    c.globalCompositeOperation = 'screen';
+    const layers = 4;
+    for (let layer = 0; layer < layers; layer++) {
+      const hue = useCustom ? 0 : (220 + layer * 50 + t * 18) % 360;
+      const freq = 0.012 + layer * 0.004;
+      const amp  = 60 + layer * 25;
+      const phase = t * 0.6 + layer * 1.7;
+      // Build a wide ribbon via Path2D
+      c.beginPath();
+      c.moveTo(0, ch);
+      for (let x = 0; x <= cw; x += 8) {
+        // Influence: closer to cursor X = larger amplitude pulse
+        const cursorInf = Math.exp(-Math.pow((x - cursorX) / (radiusPx * 1.8), 2));
+        const y = ch * 0.35 + Math.sin(x * freq + phase) * amp * (0.7 + cursorInf * strength * 1.5)
+                + Math.cos(x * freq * 1.7 + phase * 0.8) * amp * 0.4
+                - (cursorY - ch / 2) * cursorInf * 0.3;
+        c.lineTo(x, y);
+      }
+      c.lineTo(cw, ch);
+      c.closePath();
+      const grad = c.createLinearGradient(0, 0, 0, ch);
+      if (useCustom) {
+        grad.addColorStop(0,   `rgba(${cR},${cG},${cB},0)`);
+        grad.addColorStop(0.5, `rgba(${cR},${cG},${cB},${0.12 - layer * 0.02})`);
+        grad.addColorStop(1,   `rgba(${cR},${cG},${cB},0)`);
+      } else {
+        grad.addColorStop(0,   `hsla(${hue}, 80%, 55%, 0)`);
+        grad.addColorStop(0.5, `hsla(${hue}, 80%, 55%, ${0.18 - layer * 0.03})`);
+        grad.addColorStop(1,   `hsla(${(hue + 30) % 360}, 80%, 55%, 0)`);
+      }
+      c.fillStyle = grad;
+      c.fill();
+    }
+    c.restore();
+    return;
+  }
+
+  // ─── ⚡ Lightning — electric arcs from cursor to nearby chars ────────────
+  if (S.hoverMode === 'lightning') {
+    // Spawn new bolts toward random nearby chars (capped)
+    if (lightningBolts.length < 8) {
+      for (let i = 0; i < 2; i++) {
+        // Pick a random angle + distance within radius
+        const a = Math.random() * Math.PI * 2;
+        const d = (0.3 + Math.random() * 0.7) * radiusPx;
+        const tx = cursorX + Math.cos(a) * d;
+        const ty = cursorY + Math.sin(a) * d;
+        // Generate jagged midpoints
+        const segs = 4 + Math.floor(Math.random() * 3);
+        const midpoints: Array<{ x: number; y: number }> = [];
+        for (let s = 1; s < segs; s++) {
+          const tt = s / segs;
+          const lx = cursorX + (tx - cursorX) * tt;
+          const ly = cursorY + (ty - cursorY) * tt;
+          // Perpendicular jitter
+          const perpX = -(ty - cursorY);
+          const perpY = (tx - cursorX);
+          const perpLen = Math.hypot(perpX, perpY) || 1;
+          const jit = (Math.random() - 0.5) * 12 * strength;
+          midpoints.push({ x: lx + (perpX / perpLen) * jit, y: ly + (perpY / perpLen) * jit });
+        }
+        lightningBolts.push({ from: { x: cursorX, y: cursorY }, to: { x: tx, y: ty }, midpoints, t });
+      }
+    }
+    // Draw + age bolts
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    for (let i = lightningBolts.length - 1; i >= 0; i--) {
+      const b = lightningBolts[i];
+      const age = (t - b.t) / 0.15;     // bolts last ~150 ms
+      if (age >= 1) { lightningBolts.splice(i, 1); continue; }
+      const alpha = (1 - age);
+      const pts = [b.from, ...b.midpoints, b.to];
+      // Outer cyan glow
+      c.strokeStyle = `rgba(180,220,255,${alpha * 0.35})`;
+      c.lineWidth = 5;
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(pts[0].x, pts[0].y);
+      for (let p = 1; p < pts.length; p++) c.lineTo(pts[p].x, pts[p].y);
+      c.stroke();
+      // Hot white core
+      c.strokeStyle = `rgba(255,255,255,${alpha})`;
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.moveTo(pts[0].x, pts[0].y);
+      for (let p = 1; p < pts.length; p++) c.lineTo(pts[p].x, pts[p].y);
+      c.stroke();
+    }
+    c.restore();
+    // Brighten chars near any bolt endpoint
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < lines[row].length; col++) {
+        const glyph = lines[row][col];
+        if (glyph === ' ') continue;
+        const cellCx = col * CELL + CELL / 2;
+        const cellCy = row * CELL + CELL / 2;
+        const dist = Math.hypot(cellCx - cursorX, cellCy - cursorY);
+        if (dist > radiusPx) continue;
+        const prox = proxFromDist(dist, radiusPx);
+        // Flicker
+        const flicker = 0.7 + Math.random() * 0.3;
+        c.save();
+        c.shadowColor = '#aaccff';
+        c.shadowBlur = 8 * prox;
+        c.fillStyle = `rgba(${230 + 25 * prox},${240 + 15 * prox},255,${prox * flicker})`;
+        c.fillText(glyph, col * CELL, row * CELL);
+        c.restore();
+      }
+    }
     return;
   }
 
@@ -1598,17 +1942,27 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
 
       switch (S.hoverMode) {
         case 'glow': {
-          // Single high-quality draw with smooth shadow
+          // Multi-layer bloom: 3 stacked shadow passes at different radii for true cinematic bloom
           c.save();
-          c.shadowColor = themedStyle;
-          c.shadowBlur  = 14 * strength * proximity;
-          c.shadowOffsetX = 0;
-          c.shadowOffsetY = 0;
-          c.fillStyle   = themedStyle;
+          c.shadowOffsetX = 0; c.shadowOffsetY = 0;
+          c.fillStyle = themedStyle;
+          // Outer halo — wide soft glow
+          c.shadowColor = useCustom ? S.hoverColor : themedStyle;
+          c.shadowBlur  = 26 * strength * proximity;
+          c.globalAlpha = 0.5;
           c.fillText(glyph, cellX, cellY);
-          // Bright pass on the hottest cells only
-          if (proximity > 0.6) {
-            c.fillStyle = `rgba(255,255,255,${(proximity - 0.6) * 1.2})`;
+          // Mid bloom
+          c.shadowBlur  = 12 * strength * proximity;
+          c.globalAlpha = 0.8;
+          c.fillText(glyph, cellX, cellY);
+          // Tight core
+          c.shadowBlur  = 4 * strength * proximity;
+          c.globalAlpha = 1;
+          c.fillText(glyph, cellX, cellY);
+          // White-hot center on the closest cells
+          if (proximity > 0.55) {
+            c.shadowBlur = 0;
+            c.fillStyle  = `rgba(255,255,255,${(proximity - 0.55) * 1.5})`;
             c.fillText(glyph, cellX, cellY);
           }
           c.restore();
@@ -1717,6 +2071,39 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
           c.fillText(glyph, cellX, cellY);
           break;
         }
+        case 'lens': {
+          // Magnifying-glass bulge — scale + radial push outward + chromatic aberration
+          const lensP = proximity * proximity * strength;            // squared = soft outer
+          const scale = 1 + lensP * 0.9;
+          const d = distPx || 0.001;
+          const nx = dxPx / d, ny = dyPx / d;
+          // Push chars outward proportional to bulge strength
+          const push = lensP * radiusPx * 0.18;
+          const px2 = nx * push, py2 = ny * push;
+          // Chromatic aberration scales with distance from center (more split at edge)
+          const ab = (1 - proximity) * 2.2 * strength;
+          c.save();
+          c.translate(cellCx + px2, cellCy + py2);
+          c.scale(scale, scale);
+          if (ab > 0.3) {
+            // Red shifted negative perpendicular, blue shifted positive
+            c.globalCompositeOperation = 'screen';
+            c.fillStyle = `rgba(${fr},30,30,0.65)`;
+            c.fillText(glyph, -CELL / 2 - ab, -CELL / 2);
+            c.fillStyle = `rgba(30,${fg},${fb},0.65)`;
+            c.fillText(glyph, -CELL / 2 + ab, -CELL / 2);
+            c.globalCompositeOperation = 'source-over';
+            c.fillStyle = themedStyle;
+            c.fillText(glyph, -CELL / 2, -CELL / 2);
+          } else {
+            c.shadowColor = themedStyle;
+            c.shadowBlur = 3 * lensP;
+            c.fillStyle = themedStyle;
+            c.fillText(glyph, -CELL / 2, -CELL / 2);
+          }
+          c.restore();
+          break;
+        }
       }
     }
   }
@@ -1740,7 +2127,10 @@ function startHoverLoop() {
 
     // If 'idle' is OFF and cursor has barely moved + effect isn't animated-by-time,
     // skip redraw to save CPU when the user wants the effect to settle.
-    const TIMED_MODES = new Set(['wave', 'glitch', 'comet', 'particles', 'vortex', 'levitate']);
+    const TIMED_MODES = new Set([
+      'wave', 'glitch', 'comet', 'particles', 'vortex', 'levitate',
+      'plasma', 'aurora', 'shockwave', 'lightning',
+    ]);
     if (S.hoverIdle || TIMED_MODES.has(S.hoverMode) || v > 0.05) {
       if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
       else renderFrame(currentFrame);
