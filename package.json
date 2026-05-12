@@ -20,7 +20,7 @@
   "keywords": ["ascii", "ascii-art", "figma-plugin", "halftone", "dithering", "creative-coding"],
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.0",
-    "esbuild": "^0.24.0",
+    "esbuild": "^0.28.0",
     "typescript": "^5.6.0"
   },
   "dependencies": {
