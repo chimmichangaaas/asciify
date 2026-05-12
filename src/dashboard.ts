@@ -311,9 +311,18 @@ let webcamStream: MediaStream | null = null;
 let webcamRaf:    number | null      = null;
 let compareMode   = false;
 let hoverCell:    { row: number; col: number } | null = null;
-let hoverCellPx:  { x: number; y: number } | null = null; // pixel-space cursor in canvas
+let hoverPx:      { x: number; y: number } | null = null; // raw cursor in canvas px-space
+let hoverPxSm:    { x: number; y: number } | null = null; // smoothed (lerped) cursor for organic feel
+let hoverVel      = 0;                                     // smoothed cursor speed (px/frame)
 let hoverRaf:     number | null = null;
 let hoverTime     = 0;
+let hoverActive   = false;
+
+// Smooth easing — used to make proximity falloffs feel natural instead of linear
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
 // Comet trail: last N cursor positions with timestamps
 const cometTrail: Array<{ x: number; y: number; t: number }> = [];
 // Particle system
@@ -653,45 +662,47 @@ canvasEl.addEventListener('mousedown', e => {
 canvasEl.addEventListener('mousemove', e => {
   if (painting) paintAt(e);
   if (S.hoverMode === 'none') return;
-  const cell = canvasToCell(e);
-  if (!cell) return;
 
-  // 3D Tilt mode uses CSS perspective transform on the canvas itself
+  // Pixel-space cursor (logical coords, accounts for DPR + zoom CSS scaling)
+  const rect = canvasEl.getBoundingClientRect();
+  const logW = canvasEl.width  / DPR;
+  const logH = canvasEl.height / DPR;
+  const px = ((e.clientX - rect.left) / rect.width)  * logW;
+  const py = ((e.clientY - rect.top)  / rect.height) * logH;
+
+  hoverPx = { x: px, y: py };
+  if (!hoverPxSm) hoverPxSm = { x: px, y: py };
+
+  // 3D Tilt: pure CSS, no canvas redraw
   if (S.hoverMode === 'tilt') {
-    const rect = canvasEl.getBoundingClientRect();
-    const xPct = (e.clientX - rect.left) / rect.width;   // 0..1
+    const xPct = (e.clientX - rect.left) / rect.width;
     const yPct = (e.clientY - rect.top)  / rect.height;
-    const rotY = (xPct - 0.5) * 30 * (S.hoverStrength / 100); // ±15° at 100%
-    const rotX = (0.5 - yPct) * 24 * (S.hoverStrength / 100);
-    canvasEl.style.transform = `perspective(900px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
-    hoverCell = cell;
+    const rotY = (xPct - 0.5) * 22 * (S.hoverStrength / 100); // ±11° at 100%
+    const rotX = (0.5 - yPct) * 18 * (S.hoverStrength / 100);
+    canvasEl.style.transform = `perspective(1100px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
     return;
   }
 
-  if (!hoverCell || cell.row !== hoverCell.row || cell.col !== hoverCell.col) {
-    hoverCell = cell;
-    if (!CONTINUOUS_HOVER_MODES.has(S.hoverMode)) {
-      if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
-      else renderFrame(currentFrame);
-    }
-  }
-  if (CONTINUOUS_HOVER_MODES.has(S.hoverMode)) startHoverLoop();
+  // Also derive cell for paint mode + origin click
+  const cell = canvasToCell(e);
+  if (cell) hoverCell = cell;
+
+  hoverActive = true;
+  startHoverLoop();
 });
 
 canvasEl.addEventListener('mouseleave', () => {
-  if (S.hoverMode === 'tilt') {
-    // Reset the tilt smoothly
-    canvasEl.style.transform = '';
-    hoverCell = null;
-    return;
-  }
-  if (S.hoverMode !== 'none' && hoverCell) {
-    hoverCell = null;
-    cometTrail.length = 0;
-    particles.length  = 0;
-    if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
-    else renderFrame(currentFrame);
-  }
+  if (S.hoverMode === 'tilt') { canvasEl.style.transform = ''; return; }
+  if (S.hoverMode === 'none') return;
+  hoverActive  = false;
+  hoverCell    = null;
+  hoverPx      = null;
+  hoverPxSm    = null;
+  cometTrail.length = 0;
+  particles.length  = 0;
+  if (hoverRaf !== null) { cancelAnimationFrame(hoverRaf); hoverRaf = null; }
+  if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+  else renderFrame(currentFrame);
 });
 window.addEventListener('mouseup', () => { painting = false; });
 
@@ -1353,34 +1364,38 @@ function drawOverlay(c: CanvasRenderingContext2D, w: number, h: number) {
 // ── Hover effect overlay ─────────────────────────────────────────────────────
 
 function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: number, ch: number) {
-  if (S.hoverMode === 'none' || !hoverCell) return;
-  const pal      = getPalette();
-  const lines    = frame.text.split('\n');
-  const rows     = lines.length;
-  const cols     = lines.reduce((m, l) => Math.max(m, l.length), 0);
-  const radius   = S.hoverRadius;
-  const strength = S.hoverStrength / 100;
-  const t        = performance.now() * 0.001;
-  const cursorX  = hoverCell.col * CELL + CELL / 2;
-  const cursorY  = hoverCell.row * CELL + CELL / 2;
+  if (S.hoverMode === 'none' || S.hoverMode === 'tilt' || !hoverPxSm) return;
+  const pal       = getPalette();
+  const lines     = frame.text.split('\n');
+  const rows      = lines.length;
+  const cols      = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const radius    = S.hoverRadius;
+  const strength  = S.hoverStrength / 100;
+  const t         = performance.now() * 0.001;
+  const cursorX   = hoverPxSm.x;          // pixel-space cursor
+  const cursorY   = hoverPxSm.y;
+  const radiusPx  = radius * CELL;
 
   // ── Whole-canvas effects (early-return, don't do per-cell loop) ────────────
 
   if (S.hoverMode === 'spotlight') {
-    // Dim everything outside the radius with a radial gradient mask
-    const r = radius * CELL;
-    const grad = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 1.8);
-    grad.addColorStop(0,   'rgba(0,0,0,0)');
-    grad.addColorStop(0.4, 'rgba(0,0,0,0.45)');
-    grad.addColorStop(1,   'rgba(6,3,15,0.92)');
+    // Dim mask with smooth multi-stop gradient — feels softer than the previous hard 0.4/1.0
+    const r = radiusPx;
+    const grad = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 2.2);
+    grad.addColorStop(0.00, 'rgba(0,0,0,0)');
+    grad.addColorStop(0.30, 'rgba(0,0,0,0.10)');
+    grad.addColorStop(0.55, 'rgba(0,0,0,0.45)');
+    grad.addColorStop(0.85, 'rgba(2,1,4,0.85)');
+    grad.addColorStop(1.00, 'rgba(2,1,4,0.95)');
     c.fillStyle = grad;
     c.fillRect(0, 0, cw, ch);
-    // Bright halo at the center
+    // Inner bloom — soft violet halo, additive
     c.save();
-    const halo = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 0.5);
-    halo.addColorStop(0, 'rgba(168,85,247,0.18)');
-    halo.addColorStop(1, 'rgba(168,85,247,0)');
     c.globalCompositeOperation = 'lighter';
+    const halo = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 0.55);
+    halo.addColorStop(0.00, 'rgba(168,85,247,0.22)');
+    halo.addColorStop(0.55, 'rgba(168,85,247,0.06)');
+    halo.addColorStop(1.00, 'rgba(168,85,247,0)');
     c.fillStyle = halo;
     c.fillRect(0, 0, cw, ch);
     c.restore();
@@ -1388,46 +1403,52 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
   }
 
   if (S.hoverMode === 'comet') {
-    // Push current cursor pos to trail
-    cometTrail.push({ x: cursorX, y: cursorY, t });
-    while (cometTrail.length > 30) cometTrail.shift();
-    // Draw trail oldest → newest, fading out
+    // Add new sample only if cursor actually moved
+    const last = cometTrail[cometTrail.length - 1];
+    if (!last || Math.hypot(cursorX - last.x, cursorY - last.y) > 1.5) {
+      cometTrail.push({ x: cursorX, y: cursorY, t });
+    }
+    while (cometTrail.length > 36) cometTrail.shift();
+
+    // Smooth trail with bezier curves between samples for natural flow
     c.save();
     c.globalCompositeOperation = 'lighter';
     for (let i = 0; i < cometTrail.length; i++) {
       const p = cometTrail[i];
-      const age = (t - p.t) / 0.8;     // fade over 0.8 s
+      const age = (t - p.t) / 0.7;
       if (age >= 1) continue;
-      const fade = 1 - age;
-      const size = (10 + i * 1.2) * fade * strength;
-      // Outer glow
-      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3);
-      g.addColorStop(0, `rgba(217,70,239,${0.45 * fade})`);
-      g.addColorStop(0.5, `rgba(168,85,247,${0.18 * fade})`);
-      g.addColorStop(1, 'rgba(168,85,247,0)');
+      const fade = (1 - age) * (1 - age);      // ease-out for natural decay
+      const idxFade = i / cometTrail.length;   // newer points stronger
+      const size = (10 + idxFade * 18) * Math.sqrt(fade) * strength;
+      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3.2);
+      g.addColorStop(0,    `rgba(217,70,239,${0.55 * fade})`);
+      g.addColorStop(0.4,  `rgba(168,85,247,${0.22 * fade})`);
+      g.addColorStop(1,    'rgba(168,85,247,0)');
       c.fillStyle = g;
       c.fillRect(p.x - size * 3, p.y - size * 3, size * 6, size * 6);
-      // Hot core
-      c.fillStyle = `rgba(255,255,255,${0.9 * fade})`;
-      c.beginPath();
-      c.arc(p.x, p.y, size * 0.3, 0, Math.PI * 2);
-      c.fill();
+      // Hot white core only on the freshest 6 samples
+      if (i >= cometTrail.length - 6) {
+        c.fillStyle = `rgba(255,255,255,${0.85 * fade * idxFade})`;
+        c.beginPath();
+        c.arc(p.x, p.y, size * 0.25, 0, Math.PI * 2);
+        c.fill();
+      }
     }
     c.restore();
-    // Also brighten chars near the latest trail point
+    // Brighten chars within trail radius (uses pixel-space cursor — smooth)
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < lines[row].length; col++) {
         const glyph = lines[row][col];
         if (glyph === ' ') continue;
-        const dx = col - hoverCell.col;
-        const dy = row - hoverCell.row;
-        const dist = Math.hypot(dx, dy);
-        if (dist > radius * 0.7) continue;
-        const prox = 1 - dist / (radius * 0.7);
+        const cellCx = col * CELL + CELL / 2;
+        const cellCy = row * CELL + CELL / 2;
+        const dist = Math.hypot(cellCx - cursorX, cellCy - cursorY);
+        if (dist > radiusPx * 0.7) continue;
+        const prox = smoothstep(radiusPx * 0.7, 0, dist);
         c.save();
         c.shadowColor = '#d946ef';
-        c.shadowBlur = 8 * prox;
-        c.fillStyle = `rgba(255,${230 - prox * 50},${255 - prox * 80},${prox})`;
+        c.shadowBlur = 10 * prox;
+        c.fillStyle = `rgba(255,${235 - prox * 40},${255 - prox * 70},${0.6 + prox * 0.4})`;
         c.fillText(glyph, col * CELL, row * CELL);
         c.restore();
       }
@@ -1436,64 +1457,59 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
   }
 
   if (S.hoverMode === 'particles') {
-    // Emit a few new particles around cursor
-    for (let i = 0; i < 2; i++) {
+    // Emit count scales with cursor velocity (more particles when moving fast)
+    const emitCount = Math.min(5, 1 + Math.floor(hoverVel * 0.4));
+    for (let i = 0; i < emitCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 0.5 + Math.random() * 2;
+      const speed = 0.4 + Math.random() * (1.5 + hoverVel * 0.2);
       particles.push({
-        x:  cursorX + (Math.random() - 0.5) * 6,
-        y:  cursorY + (Math.random() - 0.5) * 6,
+        x:  cursorX + (Math.random() - 0.5) * 4,
+        y:  cursorY + (Math.random() - 0.5) * 4,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 0.3, // slight upward bias
+        vy: Math.sin(angle) * speed - 0.4,
         life: 0,
-        maxLife: 1.5 + Math.random() * 1.0,
-        size: 2 + Math.random() * 3,
-        hue: 270 + Math.random() * 60,     // violet → magenta range
+        maxLife: 1.4 + Math.random() * 1.4,
+        size: 1.5 + Math.random() * 2.8,
+        hue: 270 + Math.random() * 70,
       });
     }
-    // Update + draw all particles
     c.save();
     c.globalCompositeOperation = 'lighter';
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.life += 1 / 60;
-      // Apply slight gravity + drag
-      p.vy += 0.02;
-      p.vx *= 0.99;
-      p.vy *= 0.99;
+      p.vy += 0.018;            // gentler gravity
+      p.vx *= 0.985;            // gentler drag → particles drift longer
+      p.vy *= 0.985;
       p.x += p.vx;
       p.y += p.vy;
-      // Repel particles from cursor as they spawn
-      const dx = p.x - cursorX;
-      const dy = p.y - cursorY;
-      const d  = Math.hypot(dx, dy) || 1;
-      if (d < radius * CELL) {
-        p.vx += (dx / d) * 0.15 * strength;
-        p.vy += (dy / d) * 0.15 * strength;
+      // Soft repel from cursor for organic spread
+      const dxc = p.x - cursorX;
+      const dyc = p.y - cursorY;
+      const dc  = Math.hypot(dxc, dyc) || 1;
+      if (dc < radiusPx) {
+        const push = (1 - dc / radiusPx) * 0.18 * strength;
+        p.vx += (dxc / dc) * push;
+        p.vy += (dyc / dc) * push;
       }
-      // Kill old particles
-      if (p.life >= p.maxLife) {
-        particles.splice(i, 1);
-        continue;
-      }
-      // Draw
-      const fade = 1 - p.life / p.maxLife;
-      const grad = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 3);
-      grad.addColorStop(0, `hsla(${p.hue},90%,70%,${fade * 0.9})`);
-      grad.addColorStop(1, `hsla(${p.hue},90%,60%,0)`);
+      if (p.life >= p.maxLife) { particles.splice(i, 1); continue; }
+      // Ease-out fade with quadratic curve
+      const fade  = 1 - p.life / p.maxLife;
+      const alpha = fade * fade;
+      const r = p.size * (1 + (1 - fade) * 1.2); // grow slightly as fading
+      const grad = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.4);
+      grad.addColorStop(0,    `hsla(${p.hue},92%,75%,${alpha})`);
+      grad.addColorStop(0.45, `hsla(${p.hue},92%,60%,${alpha * 0.4})`);
+      grad.addColorStop(1,    `hsla(${p.hue},92%,55%,0)`);
       c.fillStyle = grad;
-      c.fillRect(p.x - p.size * 3, p.y - p.size * 3, p.size * 6, p.size * 6);
+      c.fillRect(p.x - r * 3.4, p.y - r * 3.4, r * 6.8, r * 6.8);
     }
-    // Cap particle count to keep it fast
-    if (particles.length > 120) particles.splice(0, particles.length - 120);
+    if (particles.length > 140) particles.splice(0, particles.length - 140);
     c.restore();
     return;
   }
 
-  // 'tilt' is applied via CSS transform on canvasEl — nothing to do on the canvas.
-  if (S.hoverMode === 'tilt') return;
-
-  // ── Per-cell effects ───────────────────────────────────────────────────────
+  // ── Per-cell effects (pixel-precise distance + smoothstep falloff) ─────────
 
   for (let row = 0; row < rows; row++) {
     const line = lines[row];
@@ -1501,89 +1517,115 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       const glyph = line[col];
       if (glyph === ' ') continue;
 
-      const dx = col - hoverCell.col;
-      const dy = row - hoverCell.row;
-      const dist = Math.hypot(dx, dy);
-      if (dist > radius) continue;
+      const cellX  = col * CELL;
+      const cellY  = row * CELL;
+      const cellCx = cellX + CELL / 2;
+      const cellCy = cellY + CELL / 2;
+      const dxPx   = cellCx - cursorX;
+      const dyPx   = cellCy - cursorY;
+      const distPx = Math.hypot(dxPx, dyPx);
+      if (distPx > radiusPx) continue;
 
-      const proximity = 1 - dist / radius;
-      const cellX = col * CELL;
-      const cellY = row * CELL;
+      // Smooth falloff — feels much more natural than linear
+      const proximity = smoothstep(radiusPx, 0, distPx);
+      if (proximity < 0.005) continue;
+
       const o = (row * frame.columns + col) * 3;
       const fr = frame.colors ? frame.colors[o]     : 230;
       const fg = frame.colors ? frame.colors[o + 1] : 230;
       const fb = frame.colors ? frame.colors[o + 2] : 230;
       const themedStyle = pal.fgFn(fr, fg, fb);
 
-      // Clear original cell
+      // Clear old glyph cleanly
       c.fillStyle = pal.bg;
       c.fillRect(cellX - 2, cellY - 2, CELL + 4, CELL + 4);
 
       switch (S.hoverMode) {
         case 'glow': {
+          // Single high-quality draw with smooth shadow
           c.save();
           c.shadowColor = themedStyle;
-          c.shadowBlur  = 12 * strength * proximity;
+          c.shadowBlur  = 14 * strength * proximity;
+          c.shadowOffsetX = 0;
+          c.shadowOffsetY = 0;
           c.fillStyle   = themedStyle;
           c.fillText(glyph, cellX, cellY);
-          c.fillText(glyph, cellX, cellY);
+          // Bright pass on the hottest cells only
+          if (proximity > 0.6) {
+            c.fillStyle = `rgba(255,255,255,${(proximity - 0.6) * 1.2})`;
+            c.fillText(glyph, cellX, cellY);
+          }
           c.restore();
           break;
         }
         case 'scale': {
-          const scale = 1 + strength * proximity * 0.8;
+          const scale = 1 + strength * proximity * 0.55;       // gentler max scale
           c.save();
-          c.translate(cellX + CELL / 2, cellY + CELL / 2);
+          c.translate(cellCx, cellCy);
           c.scale(scale, scale);
-          c.fillStyle = themedStyle;
+          c.shadowColor = themedStyle;
+          c.shadowBlur  = 4 * proximity;
+          c.fillStyle   = themedStyle;
           c.fillText(glyph, -CELL / 2, -CELL / 2);
           c.restore();
           break;
         }
         case 'wave': {
-          const phase  = dist - t * 6;
-          const offset = Math.sin(phase * 1.6) * strength * proximity * 6;
+          // Time-decaying ripple — phase moves outward smoothly
+          const phase  = distPx / CELL - t * 4;
+          const env    = proximity * proximity;                // squared envelope = soft edge
+          const offset = Math.sin(phase * 1.2) * env * strength * 5;
+          c.save();
           c.fillStyle = themedStyle;
           c.fillText(glyph, cellX, cellY + offset);
+          c.restore();
           break;
         }
         case 'magnet': {
-          const pullX = -dx * strength * proximity * 0.6;
-          const pullY = -dy * strength * proximity * 0.6;
+          // Smooth pull with eased proximity
+          const pullStrength = proximity * strength * 0.42;
+          const pullX = -dxPx * pullStrength;
+          const pullY = -dyPx * pullStrength;
+          c.save();
+          c.shadowColor = themedStyle;
+          c.shadowBlur  = 3 * proximity;
           c.fillStyle = themedStyle;
           c.fillText(glyph, cellX + pullX, cellY + pullY);
+          c.restore();
           break;
         }
         case 'repel': {
-          // Inverse of magnet — push away with stronger near-cursor force
-          const pushFactor = strength * proximity * proximity * 1.2;
-          const pushX = dx * pushFactor;
-          const pushY = dy * pushFactor;
+          // Smooth push with normalized direction vector + eased force
+          const d = distPx || 0.001;
+          const force = proximity * proximity * strength * (radiusPx * 0.45);
+          const pushX = (dxPx / d) * force;
+          const pushY = (dyPx / d) * force;
           c.save();
-          c.globalAlpha = 0.4 + proximity * 0.6;
+          c.globalAlpha = 0.55 + proximity * 0.45;
           c.fillStyle = themedStyle;
           c.fillText(glyph, cellX + pushX, cellY + pushY);
           c.restore();
           break;
         }
         case 'vortex': {
-          // Swirl: rotate position around cursor while pulling slightly inward
-          const angle = Math.atan2(dy, dx) + proximity * Math.PI * strength * 0.8;
-          const newDist = dist * (1 - proximity * 0.3 * strength);
-          const nx = hoverCell.col + Math.cos(angle) * newDist;
-          const ny = hoverCell.row + Math.sin(angle) * newDist;
+          // Swirl around pixel cursor with smooth angle delta
+          const ang0     = Math.atan2(dyPx, dxPx);
+          const angDelta = proximity * Math.PI * strength * 0.6;
+          const newDist  = distPx * (1 - proximity * 0.22 * strength);
+          const nx = cursorX + Math.cos(ang0 + angDelta) * newDist;
+          const ny = cursorY + Math.sin(ang0 + angDelta) * newDist;
           c.save();
           c.shadowColor = '#a855f7';
-          c.shadowBlur = 6 * proximity;
+          c.shadowBlur = 5 * proximity;
           c.fillStyle = themedStyle;
-          c.fillText(glyph, nx * CELL, ny * CELL);
+          c.fillText(glyph, nx - CELL / 2, ny - CELL / 2);
           c.restore();
           break;
         }
         case 'levitate': {
-          // Cells float up + sway
-          const lift = -strength * proximity * 6;
-          const sway = Math.sin(t * 2 + col * 0.5 + row * 0.3) * proximity * 2;
+          // Float up + slow horizontal sway — eased
+          const lift = -strength * proximity * 5;
+          const sway = Math.sin(t * 1.8 + col * 0.4 + row * 0.25) * proximity * 1.5;
           c.save();
           c.shadowColor = '#d946ef';
           c.shadowBlur = 4 * proximity;
@@ -1593,18 +1635,17 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
           break;
         }
         case 'glitch': {
-          // Scramble glyph + RGB-shifted offset draws
-          const glitchSet = '!@#$%&*+=?/<>|\\01';
-          const seed = Math.floor(t * 30 + col * 7 + row * 3);
-          const glitchGlyph = proximity > 0.3 ? glitchSet[seed % glitchSet.length] : glyph;
-          const offX = (Math.sin(seed * 1.3) * 2) * proximity;
-          const offY = (Math.cos(seed * 0.7) * 1) * proximity;
-          // RGB-shift: 3 colored draws slightly offset
+          // Less manic — change glyph slowly (every ~50ms) + softer RGB shift
+          const glitchSet = '!@#$%&*+=?/<>|\\01ABCXYZ';
+          const stepSeed  = Math.floor(t * 14 + col * 5 + row * 3);
+          const glitchGlyph = proximity > 0.25 ? glitchSet[Math.abs(stepSeed) % glitchSet.length] : glyph;
+          const offX = Math.sin(stepSeed * 1.3) * proximity * 1.4;
+          const offY = Math.cos(stepSeed * 0.7) * proximity * 0.8;
           c.save();
           c.globalCompositeOperation = 'screen';
-          c.fillStyle = `rgba(217,70,239,${0.6 + proximity * 0.4})`;
+          c.fillStyle = `rgba(217,70,239,${0.5 * proximity + 0.1})`;
           c.fillText(glitchGlyph, cellX + offX - 1, cellY + offY);
-          c.fillStyle = `rgba(0,255,255,${0.5 + proximity * 0.3})`;
+          c.fillStyle = `rgba(0,200,255,${0.4 * proximity + 0.1})`;
           c.fillText(glitchGlyph, cellX + offX + 1, cellY + offY);
           c.fillStyle = themedStyle;
           c.fillText(glitchGlyph, cellX + offX, cellY + offY);
@@ -1612,7 +1653,11 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
           break;
         }
         case 'invert': {
-          c.fillStyle = `rgb(${255 - fr},${255 - fg},${255 - fb})`;
+          // Smoothly cross-fade between original and inverted via proximity
+          const ir = Math.round(fr * (1 - proximity) + (255 - fr) * proximity);
+          const ig = Math.round(fg * (1 - proximity) + (255 - fg) * proximity);
+          const ib = Math.round(fb * (1 - proximity) + (255 - fb) * proximity);
+          c.fillStyle = `rgb(${ir},${ig},${ib})`;
           c.fillText(glyph, cellX, cellY);
           break;
         }
@@ -1621,16 +1666,26 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
   }
 }
 
-const CONTINUOUS_HOVER_MODES = new Set(['wave', 'glitch', 'comet', 'particles', 'vortex', 'levitate']);
-
 function startHoverLoop() {
   if (hoverRaf !== null) return;
   const tick = () => {
-    if (!hoverCell || S.hoverMode === 'none') { hoverRaf = null; return; }
-    if (CONTINUOUS_HOVER_MODES.has(S.hoverMode)) {
-      if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
-      else renderFrame(currentFrame);
+    if (!hoverActive || S.hoverMode === 'none' || S.hoverMode === 'tilt' || !hoverPx || !hoverPxSm) {
+      hoverRaf = null;
+      return;
     }
+    // Smooth cursor toward actual position (lower factor = more lag = smoother)
+    const SMOOTH = 0.22;
+    const prevX = hoverPxSm.x;
+    const prevY = hoverPxSm.y;
+    hoverPxSm.x += (hoverPx.x - hoverPxSm.x) * SMOOTH;
+    hoverPxSm.y += (hoverPx.y - hoverPxSm.y) * SMOOTH;
+    // Track velocity (low-pass filtered) so dynamic effects can react to mouse speed
+    const v = Math.hypot(hoverPxSm.x - prevX, hoverPxSm.y - prevY);
+    hoverVel += (v - hoverVel) * 0.3;
+
+    if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+    else renderFrame(currentFrame);
+
     hoverRaf = requestAnimationFrame(tick);
   };
   hoverRaf = requestAnimationFrame(tick);
