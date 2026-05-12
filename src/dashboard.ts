@@ -180,6 +180,13 @@ const btnCopy          = $<HTMLButtonElement>('btnCopy');
 const btnWebm          = $<HTMLButtonElement>('btnWebm');
 const btnMp4           = $<HTMLButtonElement>('btnMp4');
 const btnAniSvg        = $<HTMLButtonElement>('btnAniSvg');
+const btnHtmlInteractive = $<HTMLButtonElement>('btnHtmlInteractive');
+const btnLottie        = $<HTMLButtonElement>('btnLottie');
+const hoverModeSelect  = $<HTMLSelectElement>('hoverModeSelect');
+const hoverRadiusSlider = $<HTMLInputElement>('hoverRadiusSlider');
+const hoverRadiusVal   = $('hoverRadiusVal');
+const hoverStrengthSlider = $<HTMLInputElement>('hoverStrengthSlider');
+const hoverStrengthVal = $('hoverStrengthVal');
 
 // Compare
 const compareWrap      = $('compareWrap');
@@ -244,6 +251,10 @@ const S = {
   vignette:      0,
   grain:         0,
   glow:          0,
+  // Hover effects (live in preview, baked into Interactive HTML export)
+  hoverMode:     'none' as 'none'|'glow'|'scale'|'wave'|'magnet'|'invert',
+  hoverRadius:   5,
+  hoverStrength: 60,
 };
 
 // Mask state
@@ -296,6 +307,9 @@ const ctx  = canvasEl.getContext('2d', { willReadFrequently: true })!;
 let webcamStream: MediaStream | null = null;
 let webcamRaf:    number | null      = null;
 let compareMode   = false;
+let hoverCell: { row: number; col: number } | null = null;
+let hoverRaf:   number | null = null;
+let hoverTime   = 0;
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
@@ -539,6 +553,20 @@ themeBg.addEventListener('input', () => {
   }
 });
 
+// Hover effect controls
+hoverModeSelect.addEventListener('change', () => {
+  S.hoverMode = hoverModeSelect.value as typeof S.hoverMode;
+  if (S.hoverMode === 'none') {
+    hoverCell = null;
+    if (hoverRaf !== null) { cancelAnimationFrame(hoverRaf); hoverRaf = null; }
+  }
+  // Re-render to clear any previous hover state
+  if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+  else renderFrame(currentFrame);
+});
+makeSlider(hoverRadiusSlider,   hoverRadiusVal,   v => `${v}`,  v => { S.hoverRadius = v; });
+makeSlider(hoverStrengthSlider, hoverStrengthVal, v => `${v}%`, v => { S.hoverStrength = v; });
+
 makeSlider(scanlinesSlider, scanlinesVal, v => `${v}%`, v => {
   S.scanlines = v;
   if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress); else renderFrame(currentFrame);
@@ -609,7 +637,29 @@ canvasEl.addEventListener('mousedown', e => {
     paintAt(e);
   }
 });
-canvasEl.addEventListener('mousemove', e => { if (painting) paintAt(e); });
+canvasEl.addEventListener('mousemove', e => {
+  if (painting) paintAt(e);
+  if (S.hoverMode !== 'none') {
+    const cell = canvasToCell(e);
+    if (!cell) return;
+    if (!hoverCell || cell.row !== hoverCell.row || cell.col !== hoverCell.col) {
+      hoverCell = cell;
+      // Static effects: redraw on cell change. Wave: handled by RAF.
+      if (S.hoverMode !== 'wave') {
+        if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+        else renderFrame(currentFrame);
+      }
+    }
+    if (S.hoverMode === 'wave') startHoverLoop();
+  }
+});
+canvasEl.addEventListener('mouseleave', () => {
+  if (S.hoverMode !== 'none' && hoverCell) {
+    hoverCell = null;
+    if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+    else renderFrame(currentFrame);
+  }
+});
 window.addEventListener('mouseup', () => { painting = false; });
 
 function paintAt(e: MouseEvent) {
@@ -1128,12 +1178,14 @@ async function buildAscii() {
   if (M.progress > 0) renderAtProgress(M.progress);
   else renderFrame(currentFrame);
   [btnPng, btnJpg, btnWebp, btnSvg, btnPng2x, btnPng4x,
-   btnTxt, btnMd, btnHtml, btnAnsi, btnJson, btnPy, btnCpp, btnJs, btnCopy].forEach(b => b.disabled = false);
+   btnTxt, btnMd, btnHtml, btnAnsi, btnJson, btnPy, btnCpp, btnJs, btnCopy,
+   btnHtmlInteractive].forEach(b => b.disabled = false);
   const isAnim = asciiFrames.length >= 2;
   btnGif.disabled    = !isAnim;
   btnWebm.disabled   = !isAnim;
   btnMp4.disabled    = !isAnim;
   btnAniSvg.disabled = !isAnim;
+  btnLottie.disabled = !isAnim;
 
   const f0 = asciiFrames[0];
   infoLabel.textContent =
@@ -1265,6 +1317,101 @@ function drawOverlay(c: CanvasRenderingContext2D, w: number, h: number) {
   }
 }
 
+// ── Hover effect overlay ─────────────────────────────────────────────────────
+
+function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: number, _ch: number) {
+  if (S.hoverMode === 'none' || !hoverCell) return;
+  const pal      = getPalette();
+  const lines    = frame.text.split('\n');
+  const rows     = lines.length;
+  const cols     = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const radius   = S.hoverRadius;
+  const strength = S.hoverStrength / 100;
+  const t        = performance.now() * 0.001;
+
+  for (let row = 0; row < rows; row++) {
+    const line = lines[row];
+    for (let col = 0; col < line.length; col++) {
+      const glyph = line[col];
+      if (glyph === ' ') continue;
+
+      const dx = col - hoverCell.col;
+      const dy = row - hoverCell.row;
+      const dist = Math.hypot(dx, dy);
+      if (dist > radius) continue;
+
+      const proximity = 1 - dist / radius;        // 0..1, 1 = nearest
+      const cellX = col * CELL;
+      const cellY = row * CELL;
+      const o = (row * frame.columns + col) * 3;
+      const fr = frame.colors ? frame.colors[o]     : 230;
+      const fg = frame.colors ? frame.colors[o + 1] : 230;
+      const fb = frame.colors ? frame.colors[o + 2] : 230;
+      const themedStyle = pal.fgFn(fr, fg, fb);
+
+      // Clear original drawn glyph (small bg patch)
+      c.fillStyle = pal.bg;
+      c.fillRect(cellX - 2, cellY - 2, CELL + 4, CELL + 4);
+
+      switch (S.hoverMode) {
+        case 'glow': {
+          c.save();
+          c.shadowColor = themedStyle;
+          c.shadowBlur  = 10 * strength * proximity;
+          c.fillStyle   = themedStyle;
+          c.fillText(glyph, cellX, cellY);
+          c.fillText(glyph, cellX, cellY); // 2nd pass for stronger glow
+          c.restore();
+          break;
+        }
+        case 'scale': {
+          const scale = 1 + strength * proximity * 0.7;
+          c.save();
+          c.translate(cellX + CELL / 2, cellY + CELL / 2);
+          c.scale(scale, scale);
+          c.fillStyle = themedStyle;
+          c.fillText(glyph, -CELL / 2, -CELL / 2);
+          c.restore();
+          break;
+        }
+        case 'wave': {
+          const phase  = dist - t * 6;
+          const offset = Math.sin(phase * 1.6) * strength * proximity * 5;
+          c.fillStyle = themedStyle;
+          c.fillText(glyph, cellX, cellY + offset);
+          break;
+        }
+        case 'magnet': {
+          const pullX = -dx * strength * proximity * 0.6;
+          const pullY = -dy * strength * proximity * 0.6;
+          c.fillStyle = themedStyle;
+          c.fillText(glyph, cellX + pullX, cellY + pullY);
+          break;
+        }
+        case 'invert': {
+          c.fillStyle = `rgb(${255 - fr},${255 - fg},${255 - fb})`;
+          c.fillText(glyph, cellX, cellY);
+          break;
+        }
+      }
+    }
+  }
+}
+
+function startHoverLoop() {
+  if (hoverRaf !== null) return;
+  const tick = () => {
+    if (!hoverCell || S.hoverMode === 'none') { hoverRaf = null; return; }
+    // Only wave needs continuous redraws; others redraw on cell-change only
+    if (S.hoverMode === 'wave') {
+      if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+      else renderFrame(currentFrame);
+    }
+    hoverRaf = requestAnimationFrame(tick);
+  };
+  hoverRaf = requestAnimationFrame(tick);
+}
+
 function setCanvasSize(c: HTMLCanvasElement, c2: CanvasRenderingContext2D, cssW: number, cssH: number) {
   c.width  = Math.round(cssW * DPR);
   c.height = Math.round(cssH * DPR);
@@ -1309,6 +1456,7 @@ function renderFrame(fi: number) {
   }
 
   drawOverlay(ctx, cw, ch);
+  drawHoverEffect(ctx, frame, cw, ch);
   applyZoom(zoomPct);
   frameLabel.textContent = `${fi + 1} / ${asciiFrames.length}`;
   frameSlider.value = String(fi);
@@ -1612,6 +1760,7 @@ function renderMaskFrame(t: number, frame: AsciiResult) {
   }
 
   drawOverlay(ctx, cw, ch);
+  drawHoverEffect(ctx, frame, cw, ch);
   applyZoom(zoomPct);
 }
 
@@ -2047,6 +2196,257 @@ btnAniSvg.addEventListener('click', () => {
   // Wrap everything in a group with a repeating animation that resets opacity cycle:
   svg += `</g></svg>`;
   downloadText(svg, 'ascii-animation.svg', 'image/svg+xml');
+});
+
+// ── Interactive HTML export (with baked-in hover effects) ────────────────────
+
+btnHtmlInteractive.addEventListener('click', () => {
+  if (!asciiFrames.length) return;
+  const f = asciiFrames[currentFrame];
+  const pal = getPalette();
+  const lines = f.text.split('\n');
+  const cw = f.columns * CELL;
+  const ch = lines.length * CELL;
+  const hoverMode = S.hoverMode === 'none' ? 'glow' : S.hoverMode; // always include something
+  const radius = S.hoverRadius;
+  const strength = S.hoverStrength / 100;
+
+  // Build spans with row/col data + final color
+  let spans = '';
+  for (let r = 0; r < lines.length; r++) {
+    const line = lines[r];
+    let lineSpans = '';
+    for (let c = 0; c < line.length; c++) {
+      const ch2 = line[c];
+      const safe = ch2 === '<' ? '&lt;' : ch2 === '>' ? '&gt;' : ch2 === '&' ? '&amp;' : ch2 === ' ' ? '&nbsp;' : ch2;
+      let style = 'color:#e6e6e6';
+      if (f.colors) {
+        const o = (r * f.columns + c) * 3;
+        style = `color:${pal.fgFn(f.colors[o], f.colors[o + 1], f.colors[o + 2])}`;
+      }
+      lineSpans += `<i data-r="${r}" data-c="${c}" style="${style}">${safe}</i>`;
+    }
+    spans += `<div class="row">${lineSpans}</div>`;
+  }
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ASCII Art — Interactive</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: ${pal.bg};
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 20px;
+    font-family: 'SF Mono','Menlo','Consolas',monospace;
+  }
+  .ascii {
+    display: inline-block;
+    line-height: 1;
+    user-select: none;
+  }
+  .ascii .row { display: block; height: ${CELL}px; line-height: ${CELL}px; white-space: nowrap; }
+  .ascii i {
+    display: inline-block;
+    width: ${CELL}px;
+    height: ${CELL}px;
+    font-size: ${CELL}px;
+    font-style: normal;
+    text-align: left;
+    transition: transform 0.18s ease-out, text-shadow 0.18s ease-out, filter 0.18s ease-out;
+    transform-origin: center;
+    will-change: transform;
+  }
+  .ascii i:hover { color: #fff; }
+  /* Hover effect: ${hoverMode} */
+  ${hoverMode === 'glow' ? `
+  .ascii i.fx {
+    text-shadow: 0 0 ${4 * strength}px currentColor, 0 0 ${10 * strength}px currentColor;
+    filter: brightness(${1 + strength * 0.5});
+  }` : ''}
+  ${hoverMode === 'scale' ? `
+  .ascii i.fx { transform: scale(var(--scale, 1)); }` : ''}
+  ${hoverMode === 'wave' ? `
+  @keyframes asc-wave { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-${4 * strength}px); } }
+  .ascii i.fx { animation: asc-wave 0.6s ease-out; }` : ''}
+  ${hoverMode === 'magnet' ? `
+  .ascii i.fx { transform: translate(var(--dx, 0), var(--dy, 0)); }` : ''}
+  ${hoverMode === 'invert' ? `
+  .ascii i.fx { filter: invert(1); }` : ''}
+  .signature {
+    position: fixed; bottom: 16px; right: 16px;
+    font: 11px/1.4 'SF Mono',monospace;
+    color: ${pal.fgFn(150,150,150)};
+    opacity: 0.5;
+  }
+  .signature a { color: inherit; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <div class="ascii" id="art" aria-label="Interactive ASCII art">${spans}</div>
+  <div class="signature">made with <a href="https://yashsaindane.github.io/ascii-studio/" target="_blank">ASCII Studio</a></div>
+<script>
+(function () {
+  var art = document.getElementById('art');
+  var cells = Array.prototype.slice.call(art.querySelectorAll('i'));
+  var radius = ${radius};
+  var mode = ${JSON.stringify(hoverMode)};
+  var strength = ${strength};
+
+  // Index cells by row,col for fast lookup
+  var grid = {};
+  cells.forEach(function (el) {
+    grid[el.dataset.r + ':' + el.dataset.c] = el;
+  });
+
+  function clearAll() {
+    cells.forEach(function (el) {
+      el.classList.remove('fx');
+      el.style.removeProperty('--scale');
+      el.style.removeProperty('--dx');
+      el.style.removeProperty('--dy');
+    });
+  }
+
+  art.addEventListener('mousemove', function (e) {
+    var target = e.target;
+    if (target.tagName !== 'I') return;
+    var hr = +target.dataset.r;
+    var hc = +target.dataset.c;
+    clearAll();
+    cells.forEach(function (el) {
+      var dr = +el.dataset.r - hr;
+      var dc = +el.dataset.c - hc;
+      var dist = Math.hypot(dr, dc);
+      if (dist > radius) return;
+      var prox = 1 - dist / radius; // 0..1
+      el.classList.add('fx');
+      if (mode === 'scale') el.style.setProperty('--scale', String(1 + prox * strength * 0.7));
+      if (mode === 'magnet') {
+        el.style.setProperty('--dx', (-dc * prox * strength * 4) + 'px');
+        el.style.setProperty('--dy', (-dr * prox * strength * 4) + 'px');
+      }
+    });
+  });
+
+  art.addEventListener('mouseleave', clearAll);
+})();
+</script>
+</body>
+</html>`;
+  downloadText(html, 'ascii-art-interactive.html', 'text/html');
+});
+
+// ── Lottie JSON export ───────────────────────────────────────────────────────
+// Generates a Lottie schema (Bodymovin v5.7.4) that can be imported into:
+// Rive, Figma, After Effects, Webflow, Framer, lottie-web, Lottielab, etc.
+// One text layer per frame with on/off visibility windows.
+
+btnLottie.addEventListener('click', () => {
+  if (asciiFrames.length < 2) return;
+  const FR = 24;                           // frames per second
+  const totalSec  = asciiFrames.reduce((s, _f, i) => s + (rawDelays[i] ?? 10) / 100, 0);
+  const totalDur  = Math.max(1, Math.round(totalSec * FR));
+  const f0 = asciiFrames[0];
+  const W = f0.columns * CELL;
+  const H = f0.rows    * CELL;
+  const pal = getPalette();
+  // Parse the theme bg as RGB 0..1 for Lottie
+  function hexToLottieRgb(hex: string): number[] {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255, 1];
+  }
+  const bgColor = hexToLottieRgb(pal.bg.startsWith('#') ? pal.bg : '#0a0a0e');
+
+  // Build per-frame text layers
+  const layers: any[] = [];
+  let cum = 0;
+  for (let i = 0; i < asciiFrames.length; i++) {
+    const f = asciiFrames[i];
+    const dur = (rawDelays[i] ?? 10) / 100;
+    const inFr  = Math.round(cum * FR);
+    const outFr = Math.round((cum + dur) * FR);
+    cum += dur;
+    layers.push({
+      ddd: 0,
+      ind: i + 2,
+      ty: 5,                 // text layer
+      nm: `Frame ${i + 1}`,
+      sr: 1,
+      ks: {
+        o: { a: 0, k: 100 },
+        r: { a: 0, k: 0 },
+        p: { a: 0, k: [0, 0, 0] },
+        a: { a: 0, k: [0, 0, 0] },
+        s: { a: 0, k: [100, 100, 100] },
+      },
+      ao: 0,
+      t: {
+        d: { k: [{
+          s: {
+            sz:  [W, H],
+            ps:  [0, 0],
+            s:   CELL,                    // size in px
+            f:   'SFMono-Regular',        // font
+            t:   f.text,                  // text content
+            ca:  0,
+            j:   0,
+            tr:  0,
+            lh:  CELL,
+            ls:  0,
+            fc:  [0.9, 0.9, 0.9],         // fill color
+          },
+          t: 0,
+        }] },
+        p: {}, m: { g: 1, a: { a: 0, k: [0, 0] } }, a: [],
+      },
+      ip: inFr,
+      op: outFr,
+      st: 0,
+      bm: 0,
+    });
+  }
+
+  // Background solid (layer 1)
+  layers.unshift({
+    ddd: 0,
+    ind: 1,
+    ty: 1,                   // solid layer
+    nm: 'BG',
+    sr: 1,
+    ks: {
+      o: { a: 0, k: 100 },
+      r: { a: 0, k: 0 },
+      p: { a: 0, k: [W / 2, H / 2, 0] },
+      a: { a: 0, k: [W / 2, H / 2, 0] },
+      s: { a: 0, k: [100, 100, 100] },
+    },
+    ao: 0, sw: W, sh: H,
+    sc: pal.bg.startsWith('#') ? pal.bg : '#0a0a0e',
+    ip: 0, op: totalDur, st: 0, bm: 0,
+  });
+
+  const lottie = {
+    v: '5.7.4',
+    fr: FR,
+    ip: 0,
+    op: totalDur,
+    w:  W,
+    h:  H,
+    nm: 'ASCII Studio Animation',
+    ddd: 0,
+    assets: [],
+    fonts: { list: [{ origin: 0, fPath: '', fClass: '', fFamily: 'SF Mono', fWeight: '', fStyle: 'Regular', fName: 'SFMono-Regular', ascent: 75 }] },
+    layers,
+    markers: [],
+    meta: { g: 'ASCII Studio by Yash Saindane', a: 'Yash Saindane', d: 'Generated ' + new Date().toISOString() },
+  };
+
+  downloadText(JSON.stringify(lottie, null, 2), 'ascii-animation.lottie.json', 'application/json');
+  setStatus('✓ Lottie JSON saved — import into Rive / Figma / After Effects', 'ok');
 });
 
 // ── Mask reveal → GIF ─────────────────────────────────────────────────────────
