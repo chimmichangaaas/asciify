@@ -923,6 +923,9 @@
       position: relative;
       z-index: 1;
       pointer-events: auto;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      transform-style: preserve-3d;
+      will-change: transform;
     }
 
     /* Origin marker for radial directions (click-to-set) */
@@ -1173,11 +1176,25 @@
         <label>Mode</label>
         <select id="hoverModeSelect">
           <option value="none">None</option>
-          <option value="glow">Glow</option>
-          <option value="scale">Scale</option>
-          <option value="wave">Ripple Wave</option>
-          <option value="magnet">Magnet</option>
-          <option value="invert">Invert</option>
+          <optgroup label="Basic">
+            <option value="glow">Glow</option>
+            <option value="scale">Scale</option>
+            <option value="invert">Invert</option>
+          </optgroup>
+          <optgroup label="Physics">
+            <option value="magnet">Magnet (pull)</option>
+            <option value="repel">Repel (push)</option>
+            <option value="vortex">Vortex (swirl)</option>
+            <option value="wave">Ripple Wave</option>
+            <option value="levitate">Levitate</option>
+          </optgroup>
+          <optgroup label="Dramatic">
+            <option value="spotlight">🔦 Spotlight Reveal</option>
+            <option value="comet">☄ Comet Trail</option>
+            <option value="glitch">⚡ Glitch Storm</option>
+            <option value="particles">✨ Particles</option>
+            <option value="tilt">📐 3D Tilt</option>
+          </optgroup>
         </select>
       </div>
       <div class="ctrl-slider ctrl">

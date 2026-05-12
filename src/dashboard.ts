@@ -252,7 +252,10 @@ const S = {
   grain:         0,
   glow:          0,
   // Hover effects (live in preview, baked into Interactive HTML export)
-  hoverMode:     'none' as 'none'|'glow'|'scale'|'wave'|'magnet'|'invert',
+  hoverMode:     'none' as
+    | 'none' | 'glow' | 'scale' | 'invert'
+    | 'magnet' | 'repel' | 'vortex' | 'wave' | 'levitate'
+    | 'spotlight' | 'comet' | 'glitch' | 'particles' | 'tilt',
   hoverRadius:   5,
   hoverStrength: 60,
 };
@@ -307,9 +310,15 @@ const ctx  = canvasEl.getContext('2d', { willReadFrequently: true })!;
 let webcamStream: MediaStream | null = null;
 let webcamRaf:    number | null      = null;
 let compareMode   = false;
-let hoverCell: { row: number; col: number } | null = null;
-let hoverRaf:   number | null = null;
-let hoverTime   = 0;
+let hoverCell:    { row: number; col: number } | null = null;
+let hoverCellPx:  { x: number; y: number } | null = null; // pixel-space cursor in canvas
+let hoverRaf:     number | null = null;
+let hoverTime     = 0;
+// Comet trail: last N cursor positions with timestamps
+const cometTrail: Array<{ x: number; y: number; t: number }> = [];
+// Particle system
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; size: number; hue: number };
+const particles:  Particle[] = [];
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
@@ -560,6 +569,10 @@ hoverModeSelect.addEventListener('change', () => {
     hoverCell = null;
     if (hoverRaf !== null) { cancelAnimationFrame(hoverRaf); hoverRaf = null; }
   }
+  // Reset CSS transform from tilt mode + clear effect buffers
+  canvasEl.style.transform = `scale(${zoomPct / 100})`;
+  cometTrail.length = 0;
+  particles.length  = 0;
   // Re-render to clear any previous hover state
   if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
   else renderFrame(currentFrame);
@@ -639,23 +652,43 @@ canvasEl.addEventListener('mousedown', e => {
 });
 canvasEl.addEventListener('mousemove', e => {
   if (painting) paintAt(e);
-  if (S.hoverMode !== 'none') {
-    const cell = canvasToCell(e);
-    if (!cell) return;
-    if (!hoverCell || cell.row !== hoverCell.row || cell.col !== hoverCell.col) {
-      hoverCell = cell;
-      // Static effects: redraw on cell change. Wave: handled by RAF.
-      if (S.hoverMode !== 'wave') {
-        if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
-        else renderFrame(currentFrame);
-      }
-    }
-    if (S.hoverMode === 'wave') startHoverLoop();
+  if (S.hoverMode === 'none') return;
+  const cell = canvasToCell(e);
+  if (!cell) return;
+
+  // 3D Tilt mode uses CSS perspective transform on the canvas itself
+  if (S.hoverMode === 'tilt') {
+    const rect = canvasEl.getBoundingClientRect();
+    const xPct = (e.clientX - rect.left) / rect.width;   // 0..1
+    const yPct = (e.clientY - rect.top)  / rect.height;
+    const rotY = (xPct - 0.5) * 30 * (S.hoverStrength / 100); // ±15° at 100%
+    const rotX = (0.5 - yPct) * 24 * (S.hoverStrength / 100);
+    canvasEl.style.transform = `perspective(900px) rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
+    hoverCell = cell;
+    return;
   }
+
+  if (!hoverCell || cell.row !== hoverCell.row || cell.col !== hoverCell.col) {
+    hoverCell = cell;
+    if (!CONTINUOUS_HOVER_MODES.has(S.hoverMode)) {
+      if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
+      else renderFrame(currentFrame);
+    }
+  }
+  if (CONTINUOUS_HOVER_MODES.has(S.hoverMode)) startHoverLoop();
 });
+
 canvasEl.addEventListener('mouseleave', () => {
+  if (S.hoverMode === 'tilt') {
+    // Reset the tilt smoothly
+    canvasEl.style.transform = '';
+    hoverCell = null;
+    return;
+  }
   if (S.hoverMode !== 'none' && hoverCell) {
     hoverCell = null;
+    cometTrail.length = 0;
+    particles.length  = 0;
     if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
     else renderFrame(currentFrame);
   }
@@ -1319,7 +1352,7 @@ function drawOverlay(c: CanvasRenderingContext2D, w: number, h: number) {
 
 // ── Hover effect overlay ─────────────────────────────────────────────────────
 
-function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: number, _ch: number) {
+function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: number, ch: number) {
   if (S.hoverMode === 'none' || !hoverCell) return;
   const pal      = getPalette();
   const lines    = frame.text.split('\n');
@@ -1328,6 +1361,139 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: n
   const radius   = S.hoverRadius;
   const strength = S.hoverStrength / 100;
   const t        = performance.now() * 0.001;
+  const cursorX  = hoverCell.col * CELL + CELL / 2;
+  const cursorY  = hoverCell.row * CELL + CELL / 2;
+
+  // ── Whole-canvas effects (early-return, don't do per-cell loop) ────────────
+
+  if (S.hoverMode === 'spotlight') {
+    // Dim everything outside the radius with a radial gradient mask
+    const r = radius * CELL;
+    const grad = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 1.8);
+    grad.addColorStop(0,   'rgba(0,0,0,0)');
+    grad.addColorStop(0.4, 'rgba(0,0,0,0.45)');
+    grad.addColorStop(1,   'rgba(6,3,15,0.92)');
+    c.fillStyle = grad;
+    c.fillRect(0, 0, cw, ch);
+    // Bright halo at the center
+    c.save();
+    const halo = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, r * 0.5);
+    halo.addColorStop(0, 'rgba(168,85,247,0.18)');
+    halo.addColorStop(1, 'rgba(168,85,247,0)');
+    c.globalCompositeOperation = 'lighter';
+    c.fillStyle = halo;
+    c.fillRect(0, 0, cw, ch);
+    c.restore();
+    return;
+  }
+
+  if (S.hoverMode === 'comet') {
+    // Push current cursor pos to trail
+    cometTrail.push({ x: cursorX, y: cursorY, t });
+    while (cometTrail.length > 30) cometTrail.shift();
+    // Draw trail oldest → newest, fading out
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < cometTrail.length; i++) {
+      const p = cometTrail[i];
+      const age = (t - p.t) / 0.8;     // fade over 0.8 s
+      if (age >= 1) continue;
+      const fade = 1 - age;
+      const size = (10 + i * 1.2) * fade * strength;
+      // Outer glow
+      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, size * 3);
+      g.addColorStop(0, `rgba(217,70,239,${0.45 * fade})`);
+      g.addColorStop(0.5, `rgba(168,85,247,${0.18 * fade})`);
+      g.addColorStop(1, 'rgba(168,85,247,0)');
+      c.fillStyle = g;
+      c.fillRect(p.x - size * 3, p.y - size * 3, size * 6, size * 6);
+      // Hot core
+      c.fillStyle = `rgba(255,255,255,${0.9 * fade})`;
+      c.beginPath();
+      c.arc(p.x, p.y, size * 0.3, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.restore();
+    // Also brighten chars near the latest trail point
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < lines[row].length; col++) {
+        const glyph = lines[row][col];
+        if (glyph === ' ') continue;
+        const dx = col - hoverCell.col;
+        const dy = row - hoverCell.row;
+        const dist = Math.hypot(dx, dy);
+        if (dist > radius * 0.7) continue;
+        const prox = 1 - dist / (radius * 0.7);
+        c.save();
+        c.shadowColor = '#d946ef';
+        c.shadowBlur = 8 * prox;
+        c.fillStyle = `rgba(255,${230 - prox * 50},${255 - prox * 80},${prox})`;
+        c.fillText(glyph, col * CELL, row * CELL);
+        c.restore();
+      }
+    }
+    return;
+  }
+
+  if (S.hoverMode === 'particles') {
+    // Emit a few new particles around cursor
+    for (let i = 0; i < 2; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.5 + Math.random() * 2;
+      particles.push({
+        x:  cursorX + (Math.random() - 0.5) * 6,
+        y:  cursorY + (Math.random() - 0.5) * 6,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.3, // slight upward bias
+        life: 0,
+        maxLife: 1.5 + Math.random() * 1.0,
+        size: 2 + Math.random() * 3,
+        hue: 270 + Math.random() * 60,     // violet → magenta range
+      });
+    }
+    // Update + draw all particles
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life += 1 / 60;
+      // Apply slight gravity + drag
+      p.vy += 0.02;
+      p.vx *= 0.99;
+      p.vy *= 0.99;
+      p.x += p.vx;
+      p.y += p.vy;
+      // Repel particles from cursor as they spawn
+      const dx = p.x - cursorX;
+      const dy = p.y - cursorY;
+      const d  = Math.hypot(dx, dy) || 1;
+      if (d < radius * CELL) {
+        p.vx += (dx / d) * 0.15 * strength;
+        p.vy += (dy / d) * 0.15 * strength;
+      }
+      // Kill old particles
+      if (p.life >= p.maxLife) {
+        particles.splice(i, 1);
+        continue;
+      }
+      // Draw
+      const fade = 1 - p.life / p.maxLife;
+      const grad = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 3);
+      grad.addColorStop(0, `hsla(${p.hue},90%,70%,${fade * 0.9})`);
+      grad.addColorStop(1, `hsla(${p.hue},90%,60%,0)`);
+      c.fillStyle = grad;
+      c.fillRect(p.x - p.size * 3, p.y - p.size * 3, p.size * 6, p.size * 6);
+    }
+    // Cap particle count to keep it fast
+    if (particles.length > 120) particles.splice(0, particles.length - 120);
+    c.restore();
+    return;
+  }
+
+  // 'tilt' is applied via CSS transform on canvasEl — nothing to do on the canvas.
+  if (S.hoverMode === 'tilt') return;
+
+  // ── Per-cell effects ───────────────────────────────────────────────────────
 
   for (let row = 0; row < rows; row++) {
     const line = lines[row];
@@ -1340,7 +1506,7 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: n
       const dist = Math.hypot(dx, dy);
       if (dist > radius) continue;
 
-      const proximity = 1 - dist / radius;        // 0..1, 1 = nearest
+      const proximity = 1 - dist / radius;
       const cellX = col * CELL;
       const cellY = row * CELL;
       const o = (row * frame.columns + col) * 3;
@@ -1349,7 +1515,7 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: n
       const fb = frame.colors ? frame.colors[o + 2] : 230;
       const themedStyle = pal.fgFn(fr, fg, fb);
 
-      // Clear original drawn glyph (small bg patch)
+      // Clear original cell
       c.fillStyle = pal.bg;
       c.fillRect(cellX - 2, cellY - 2, CELL + 4, CELL + 4);
 
@@ -1357,15 +1523,15 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: n
         case 'glow': {
           c.save();
           c.shadowColor = themedStyle;
-          c.shadowBlur  = 10 * strength * proximity;
+          c.shadowBlur  = 12 * strength * proximity;
           c.fillStyle   = themedStyle;
           c.fillText(glyph, cellX, cellY);
-          c.fillText(glyph, cellX, cellY); // 2nd pass for stronger glow
+          c.fillText(glyph, cellX, cellY);
           c.restore();
           break;
         }
         case 'scale': {
-          const scale = 1 + strength * proximity * 0.7;
+          const scale = 1 + strength * proximity * 0.8;
           c.save();
           c.translate(cellX + CELL / 2, cellY + CELL / 2);
           c.scale(scale, scale);
@@ -1376,7 +1542,7 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: n
         }
         case 'wave': {
           const phase  = dist - t * 6;
-          const offset = Math.sin(phase * 1.6) * strength * proximity * 5;
+          const offset = Math.sin(phase * 1.6) * strength * proximity * 6;
           c.fillStyle = themedStyle;
           c.fillText(glyph, cellX, cellY + offset);
           break;
@@ -1386,6 +1552,63 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: n
           const pullY = -dy * strength * proximity * 0.6;
           c.fillStyle = themedStyle;
           c.fillText(glyph, cellX + pullX, cellY + pullY);
+          break;
+        }
+        case 'repel': {
+          // Inverse of magnet — push away with stronger near-cursor force
+          const pushFactor = strength * proximity * proximity * 1.2;
+          const pushX = dx * pushFactor;
+          const pushY = dy * pushFactor;
+          c.save();
+          c.globalAlpha = 0.4 + proximity * 0.6;
+          c.fillStyle = themedStyle;
+          c.fillText(glyph, cellX + pushX, cellY + pushY);
+          c.restore();
+          break;
+        }
+        case 'vortex': {
+          // Swirl: rotate position around cursor while pulling slightly inward
+          const angle = Math.atan2(dy, dx) + proximity * Math.PI * strength * 0.8;
+          const newDist = dist * (1 - proximity * 0.3 * strength);
+          const nx = hoverCell.col + Math.cos(angle) * newDist;
+          const ny = hoverCell.row + Math.sin(angle) * newDist;
+          c.save();
+          c.shadowColor = '#a855f7';
+          c.shadowBlur = 6 * proximity;
+          c.fillStyle = themedStyle;
+          c.fillText(glyph, nx * CELL, ny * CELL);
+          c.restore();
+          break;
+        }
+        case 'levitate': {
+          // Cells float up + sway
+          const lift = -strength * proximity * 6;
+          const sway = Math.sin(t * 2 + col * 0.5 + row * 0.3) * proximity * 2;
+          c.save();
+          c.shadowColor = '#d946ef';
+          c.shadowBlur = 4 * proximity;
+          c.fillStyle = themedStyle;
+          c.fillText(glyph, cellX + sway, cellY + lift);
+          c.restore();
+          break;
+        }
+        case 'glitch': {
+          // Scramble glyph + RGB-shifted offset draws
+          const glitchSet = '!@#$%&*+=?/<>|\\01';
+          const seed = Math.floor(t * 30 + col * 7 + row * 3);
+          const glitchGlyph = proximity > 0.3 ? glitchSet[seed % glitchSet.length] : glyph;
+          const offX = (Math.sin(seed * 1.3) * 2) * proximity;
+          const offY = (Math.cos(seed * 0.7) * 1) * proximity;
+          // RGB-shift: 3 colored draws slightly offset
+          c.save();
+          c.globalCompositeOperation = 'screen';
+          c.fillStyle = `rgba(217,70,239,${0.6 + proximity * 0.4})`;
+          c.fillText(glitchGlyph, cellX + offX - 1, cellY + offY);
+          c.fillStyle = `rgba(0,255,255,${0.5 + proximity * 0.3})`;
+          c.fillText(glitchGlyph, cellX + offX + 1, cellY + offY);
+          c.fillStyle = themedStyle;
+          c.fillText(glitchGlyph, cellX + offX, cellY + offY);
+          c.restore();
           break;
         }
         case 'invert': {
@@ -1398,12 +1621,13 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, _cw: n
   }
 }
 
+const CONTINUOUS_HOVER_MODES = new Set(['wave', 'glitch', 'comet', 'particles', 'vortex', 'levitate']);
+
 function startHoverLoop() {
   if (hoverRaf !== null) return;
   const tick = () => {
     if (!hoverCell || S.hoverMode === 'none') { hoverRaf = null; return; }
-    // Only wave needs continuous redraws; others redraw on cell-change only
-    if (S.hoverMode === 'wave') {
+    if (CONTINUOUS_HOVER_MODES.has(S.hoverMode)) {
       if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
       else renderFrame(currentFrame);
     }
