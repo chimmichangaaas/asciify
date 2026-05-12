@@ -1,6 +1,6 @@
 {
-  "name": "ASCII Art & Animation",
-  "id": "ascii-art-animation",
+  "name": "Asciify — ASCII Art & Animation",
+  "id": "asciify-figma",
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",

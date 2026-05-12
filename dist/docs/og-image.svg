@@ -68,7 +68,7 @@
   <!-- Title -->
   <text x="240" y="270" font-family="-apple-system, BlinkMacSystemFont, 'Inter', sans-serif"
         font-size="96" font-weight="800" fill="url(#titleGrad)" letter-spacing="-3">
-    ASCII Studio
+    Asciify
   </text>
 
   <!-- Tagline -->

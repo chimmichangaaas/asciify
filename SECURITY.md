@@ -2,10 +2,10 @@
 
 ## Reporting a vulnerability
 
-If you discover a security vulnerability in ASCII Studio, **please do not file a public issue.** Instead, report it privately:
+If you discover a security vulnerability in Asciify, **please do not file a public issue.** Instead, report it privately:
 
 - 𝕏 / Twitter DM: [@yashsaindane](https://x.com/yashsaindane)
-- GitHub Security Advisories: https://github.com/yashsaindane/ascii-studio/security/advisories/new
+- GitHub Security Advisories: https://github.com/yashsaindane/asciify/security/advisories/new
 
 I'll acknowledge receipt within 72 hours and aim to ship a fix within 14 days for critical issues.
 

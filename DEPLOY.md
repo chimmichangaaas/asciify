@@ -1,4 +1,4 @@
-# 🚀 Deploy Guide — Get ASCII Studio Live
+# 🚀 Deploy Guide — Get Asciify Live
 
 You have **two options**. Both are free.
 
@@ -19,7 +19,7 @@ You have **two options**. Both are free.
 
 ### A. Get a GitHub account
 1. Go to https://github.com and sign up (free)
-2. **Username matters** — use a short clean one. Whatever you pick will appear in your URL like `yourname.github.io/ascii-studio`
+2. **Username matters** — use a short clean one. Whatever you pick will appear in your URL like `yourname.github.io/asciify`
 
 ### B. Install Git if you haven't
 - **Mac**: open Terminal, type `git --version`. If it asks to install Xcode tools, say yes.
@@ -40,7 +40,7 @@ You already have a local repo (I set that up earlier). Now we need to push it.
 
 ### 1.1 Create a new repo on GitHub
 1. Go to https://github.com/new
-2. **Repository name**: `ascii-studio`
+2. **Repository name**: `asciify`
 3. **Description**: `Turn images into typographic art — mask reveals, hover effects, 17+ exports`
 4. **Public** (required for free GitHub Pages)
 5. **Do NOT check** "Add a README" or "Add a .gitignore" — your repo already has them
@@ -53,7 +53,7 @@ GitHub shows you commands on the next page. Use the **"…or push an existing re
 cd /Users/yashsaindane/Desktop/roast
 
 # Add GitHub as the remote (replace YOURUSERNAME with your GitHub username)
-git remote add origin https://github.com/YOURUSERNAME/ascii-studio.git
+git remote add origin https://github.com/YOURUSERNAME/asciify.git
 
 # Make sure your branch is called "main" (modern default)
 git branch -M main
@@ -92,7 +92,7 @@ GitHub will ask for credentials. Use a **Personal Access Token** instead of your
 ### 2.A.3 Visit your site
 Your site is now live at:
 ```
-https://YOURUSERNAME.github.io/ascii-studio/
+https://YOURUSERNAME.github.io/asciify/
 ```
 
 🎉 **Done.** Every `git push origin main` from now on will redeploy automatically.
@@ -108,7 +108,7 @@ https://YOURUSERNAME.github.io/ascii-studio/
 
 ### 2.B.2 Import the project
 1. Vercel dashboard → click **Add New…** → **Project**
-2. Find **ascii-studio** in the list of your repos → click **Import**
+2. Find **asciify** in the list of your repos → click **Import**
 3. **Framework Preset**: leave as **Other** (it'll auto-detect from `vercel.json`)
 4. **Build settings** should already be filled from `vercel.json`:
    - Build Command: `npm run build`
@@ -119,7 +119,7 @@ https://YOURUSERNAME.github.io/ascii-studio/
 ### 2.B.3 Wait ~30 seconds
 Vercel will build + deploy. You'll see a confetti animation and a URL like:
 ```
-https://ascii-studio-yourname.vercel.app
+https://asciify-yourname.vercel.app
 ```
 
 🎉 **Done.** Every push to `main` redeploys automatically.
@@ -161,22 +161,22 @@ That's it. GitHub Actions (for Pages) or Vercel (for Vercel) will rebuild and re
 
 ## 🖼 Step 5 — Fix the preview thumbnail URL (do this AFTER first deploy)
 
-The Open Graph meta tags in `src/dashboard.html` are currently pointing to `https://yashsaindane.github.io/ascii-studio/`. If your URL is different (e.g. a Vercel URL or custom domain), the preview won't load right when shared.
+The Open Graph meta tags in `src/dashboard.html` are currently pointing to `https://yashsaindane.github.io/asciify/`. If your URL is different (e.g. a Vercel URL or custom domain), the preview won't load right when shared.
 
 ### Quick fix
 Open `src/dashboard.html` and find these lines near the top (search for `yashsaindane.github.io`):
 
 ```html
-<meta property="og:url" content="https://yashsaindane.github.io/ascii-studio/" />
-<meta property="og:image" content="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" />
-<meta property="og:image:secure_url" content="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" />
-<meta name="twitter:image" content="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" />
-<link rel="canonical" href="https://yashsaindane.github.io/ascii-studio/" />
-<meta property="og:image:secure_url" content="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" />
-<link rel="image_src" href="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" />
+<meta property="og:url" content="https://yashsaindane.github.io/asciify/" />
+<meta property="og:image" content="https://yashsaindane.github.io/asciify/docs/og-image.png" />
+<meta property="og:image:secure_url" content="https://yashsaindane.github.io/asciify/docs/og-image.png" />
+<meta name="twitter:image" content="https://yashsaindane.github.io/asciify/docs/og-image.png" />
+<link rel="canonical" href="https://yashsaindane.github.io/asciify/" />
+<meta property="og:image:secure_url" content="https://yashsaindane.github.io/asciify/docs/og-image.png" />
+<link rel="image_src" href="https://yashsaindane.github.io/asciify/docs/og-image.png" />
 ```
 
-Replace `https://yashsaindane.github.io/ascii-studio/` with your actual live URL, save, commit, push.
+Replace `https://yashsaindane.github.io/asciify/` with your actual live URL, save, commit, push.
 
 Same goes for the share URL helper in `src/dashboard.ts` — search for `PUBLIC_URL` and update it.
 
@@ -215,9 +215,9 @@ ls dist/
 | What | Where |
 |---|---|
 | Local source code | `/Users/yashsaindane/Desktop/roast` |
-| GitHub repo | `https://github.com/YOURUSERNAME/ascii-studio` |
-| GitHub Pages site | `https://YOURUSERNAME.github.io/ascii-studio/` |
-| Vercel site | `https://ascii-studio-YOURUSERNAME.vercel.app` |
+| GitHub repo | `https://github.com/YOURUSERNAME/asciify` |
+| GitHub Pages site | `https://YOURUSERNAME.github.io/asciify/` |
+| Vercel site | `https://asciify-YOURUSERNAME.vercel.app` |
 | Custom domain | (whatever you set) |
 
 ---

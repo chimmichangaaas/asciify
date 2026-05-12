@@ -33,6 +33,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ascii-studio-build
+          name: asciify-build
           path: dist/
           retention-days: 30

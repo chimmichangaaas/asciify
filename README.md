@@ -1,10 +1,10 @@
-# ASCII Studio
+# Asciify
 
 > Turn images, GIFs and videos into living typographic art.
 > A standalone web dashboard with mask reveals, dither modes, themes, and one-click exports.
 
 <p align="center">
-  <img src="docs/hero.png" alt="ASCII Studio preview" width="800" />
+  <img src="docs/hero.png" alt="Asciify preview" width="800" />
 </p>
 
 ---
@@ -80,7 +80,7 @@ Outputs:
 ## Project structure
 
 ```
-ascii-studio/
+asciify/
 ├── src/
 │   ├── ascii.ts            # core image → ASCII conversion
 │   ├── decode-image.ts     # PNG/JPG decoder
@@ -116,7 +116,7 @@ ascii-studio/
 - GitHub: [@yashsaindane](https://github.com/yashsaindane)
 - LinkedIn: [yashsaindane](https://linkedin.com/in/yashsaindane)
 
-If you ship something cool with ASCII Studio, tag me — I'd love to see it.
+If you ship something cool with Asciify, tag me — I'd love to see it.
 
 ---
 
