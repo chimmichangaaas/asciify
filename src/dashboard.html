@@ -41,8 +41,10 @@
   <!-- Canonical -->
   <link rel="canonical" href="https://chimmichangaaas.github.io/asciify/" />
 
-  <!-- Favicon (inline SVG) -->
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%234f46e5'/%3E%3Ctext x='50' y='74' font-family='SF Mono,Menlo,monospace' font-size='62' fill='white' text-anchor='middle' font-weight='700'%3E⠿%3C/text%3E%3C/svg%3E" />
+  <!-- Favicon (PNG, served from docs/) -->
+  <link rel="icon" type="image/png" sizes="128x128" href="docs/favicon.png" />
+  <link rel="icon" type="image/png" sizes="32x32"   href="docs/favicon-32.png" />
+  <link rel="apple-touch-icon" href="docs/logo-256.png" />
   <style>
     :root {
       /* Warm light theme — original look */
@@ -125,15 +127,15 @@
       gap: 11px;
     }
     #sidebar-header .logo-mark {
-      width: 36px; height: 36px;
+      width: 40px; height: 40px;
       border-radius: 9px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      color: #fff;
-      font: 700 18px/1 'SF Mono','Menlo',monospace;
-      display: flex; align-items: center; justify-content: center;
+      background: #000;
+      background-image: url('docs/logo-256.png');
+      background-size: cover;
+      background-position: center;
       box-shadow:
-        0 6px 16px rgba(79,70,229,0.28),
-        inset 0 1px 0 rgba(255,255,255,0.2);
+        0 6px 16px rgba(168,164,255,0.25),
+        0 0 0 1px rgba(168,164,255,0.18);
       flex-shrink: 0;
     }
     #sidebar-header .title-stack { display: flex; flex-direction: column; min-width: 0; }
@@ -412,14 +414,14 @@
       box-shadow: 0 14px 36px rgba(20,20,30,0.16), 0 2px 6px rgba(20,20,30,0.08);
     }
     #authorCard .author-glyph {
-      width: 30px; height: 30px;
+      width: 32px; height: 32px;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      color: #fff;
-      font: 700 15px/1 'SF Mono','Menlo',monospace;
-      display: flex; align-items: center; justify-content: center;
+      background: #000;
+      background-image: url('docs/logo-256.png');
+      background-size: cover;
+      background-position: center;
       flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(79,70,229,0.3);
+      box-shadow: 0 2px 10px rgba(168,164,255,0.35);
     }
     #authorCard .author-text { display: flex; flex-direction: column; min-width: 0; }
     #authorCard .author-name {
@@ -502,13 +504,14 @@
     }
     .modal-close:hover { background: var(--panel); color: var(--text); }
     .modal-mark {
-      width: 52px; height: 52px;
+      width: 56px; height: 56px;
       border-radius: 14px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      color: #fff;
-      font: 700 28px/1 'SF Mono','Menlo',monospace;
-      display: flex; align-items: center; justify-content: center;
+      background: #000;
+      background-image: url('docs/logo-256.png');
+      background-size: cover;
+      background-position: center;
       margin: 0 auto 16px;
+      box-shadow: 0 6px 20px rgba(168,164,255,0.3);
     }
     .modal-title {
       font-size: 18px;
@@ -1037,7 +1040,7 @@
 <aside id="sidebar" data-tab="style">
   <div id="sidebar-header">
     <div class="logo-row">
-      <div class="logo-mark">⠿</div>
+      <div class="logo-mark" aria-label="Asciify logo"></div>
       <div class="title-stack">
         <h1>Asciify</h1>
         <p>Preview &amp; export</p>
@@ -1556,7 +1559,7 @@
 <div id="newsletterBackdrop" class="modal-backdrop" style="display:none;">
   <div class="modal-card" role="dialog" aria-label="Newsletter signup">
     <button class="modal-close" id="newsletterClose" aria-label="Close">×</button>
-    <div class="modal-mark">⠿</div>
+    <div class="modal-mark" aria-label="Asciify"></div>
     <h2 class="modal-title">Don't miss the next drop.</h2>
     <p class="modal-body">
       Get new presets, render modes, and tutorials in your inbox.
@@ -1574,7 +1577,7 @@
 <div id="shareBackdrop" class="modal-backdrop" style="display:none;">
   <div class="modal-card share-card" role="dialog" aria-label="Share your ASCII creation">
     <button class="modal-close" id="shareClose" aria-label="Close">×</button>
-    <div class="modal-mark">⠿</div>
+    <div class="modal-mark" aria-label="Asciify"></div>
     <h2 class="modal-title">Share your creation</h2>
     <p class="modal-body">This link bundles every setting — direction, theme, paint, exports.<br/>Anyone who opens it lands on your exact configuration.</p>
 
@@ -1644,7 +1647,7 @@
 
   <!-- Author / socials card (floating bottom-right) -->
   <div id="authorCard">
-    <div class="author-glyph">⠿</div>
+    <div class="author-glyph" aria-label="Asciify"></div>
     <div class="author-text">
       <div class="author-name">Yash Saindane</div>
       <div class="author-role">Built Asciify · 2026</div>

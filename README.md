@@ -1,4 +1,8 @@
-# Asciify
+<p align="center">
+  <img src="docs/logo-512.png" alt="Asciify" width="180" />
+</p>
+
+<h1 align="center">Asciify</h1>
 
 > Turn images, GIFs and videos into living typographic art.
 > A standalone web dashboard with mask reveals, dither modes, themes, and one-click exports.
