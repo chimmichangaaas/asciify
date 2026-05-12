@@ -265,7 +265,8 @@ const S = {
     | 'none' | 'glow' | 'scale' | 'invert'
     | 'magnet' | 'repel' | 'vortex' | 'wave' | 'levitate'
     | 'spotlight' | 'comet' | 'glitch' | 'particles' | 'tilt'
-    | 'plasma' | 'lens' | 'lightning' | 'shockwave' | 'aurora',
+    | 'plasma' | 'lens' | 'lightning' | 'shockwave' | 'aurora'
+    | 'mask-reveal' | 'mask-paint' | 'mask-trail' | 'mask-erase',
   hoverRadius:   5,
   hoverStrength: 60,
   hoverSmooth:   22,      // cursor lag % (5 = very smooth/laggy, 100 = instant)
@@ -364,6 +365,16 @@ const shockwaves: Array<{ x: number; y: number; t: number; maxR: number }> = [];
 // Lightning bolt segments cached briefly for stability
 type LightningBolt = { from: { x: number; y: number }; to: { x: number; y: number }; midpoints: Array<{ x: number; y: number }>; t: number };
 const lightningBolts: LightningBolt[] = [];
+// Mask hover state: per-cell "touched at time" buffer + dims
+let maskBuf:  Float32Array | null = null;
+let maskDims: { rows: number; cols: number } | null = null;
+function ensureMaskBuf(rows: number, cols: number) {
+  if (!maskBuf || !maskDims || maskDims.rows !== rows || maskDims.cols !== cols) {
+    maskBuf  = new Float32Array(rows * cols);
+    maskDims = { rows, cols };
+  }
+}
+function clearMaskBuf() { if (maskBuf) maskBuf.fill(0); }
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
@@ -620,6 +631,7 @@ hoverModeSelect.addEventListener('change', () => {
   particles.length  = 0;
   shockwaves.length = 0;
   lightningBolts.length = 0;
+  clearMaskBuf();
   // Re-render to clear any previous hover state
   if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
   else renderFrame(currentFrame);
@@ -758,6 +770,7 @@ canvasEl.addEventListener('mouseleave', () => {
   particles.length  = 0;
   shockwaves.length = 0;
   lightningBolts.length = 0;
+  clearMaskBuf();
   if (hoverRaf !== null) { cancelAnimationFrame(hoverRaf); hoverRaf = null; }
   if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
   else renderFrame(currentFrame);
@@ -1833,6 +1846,137 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
     return;
   }
 
+  // ─── 🎭 Mask hover modes — paint/reveal/erase the ASCII with the cursor ──
+  if (S.hoverMode === 'mask-reveal' || S.hoverMode === 'mask-paint' ||
+      S.hoverMode === 'mask-trail'  || S.hoverMode === 'mask-erase') {
+    ensureMaskBuf(rows, cols);
+
+    // Wipe canvas to bg — we'll redraw chars selectively
+    c.fillStyle = pal.bg;
+    c.fillRect(0, 0, cw, ch);
+
+    // Update touch buffer for paint/trail/erase modes — only iterate the
+    // bounding box of the cursor radius for performance
+    if (S.hoverMode !== 'mask-reveal' && maskBuf) {
+      const minCol = Math.max(0, Math.floor((cursorX - radiusPx) / CELL));
+      const maxCol = Math.min(cols - 1, Math.ceil((cursorX + radiusPx) / CELL));
+      const minRow = Math.max(0, Math.floor((cursorY - radiusPx) / CELL));
+      const maxRow = Math.min(rows - 1, Math.ceil((cursorY + radiusPx) / CELL));
+      for (let row = minRow; row <= maxRow; row++) {
+        for (let col = minCol; col <= maxCol; col++) {
+          const cellCx = col * CELL + CELL / 2;
+          const cellCy = row * CELL + CELL / 2;
+          const d = Math.hypot(cellCx - cursorX, cellCy - cursorY);
+          if (d <= radiusPx) {
+            // Stronger strength = larger "stamp" effect
+            maskBuf[row * cols + col] = t;
+          }
+        }
+      }
+    }
+
+    // Configurable timing for paint/trail modes (use S.hoverSpeed)
+    const FADE_IN_S    = 0.20 / speed;
+    const SETTLE_S     = 0.45 / speed;   // flip duration (trail mode)
+    const HOLD_S       = 1.40 / speed;   // how long fully-revealed lasts
+    const FADE_OUT_S   = 0.60 / speed;
+    const charset      = M.flipCharset || '01/\\_*+.-=';
+
+    // Render every char based on mode
+    for (let row = 0; row < rows; row++) {
+      const line = lines[row];
+      for (let col = 0; col < line.length; col++) {
+        const glyph = line[col];
+        if (glyph === ' ') continue;
+        const cellCx = col * CELL + CELL / 2;
+        const cellCy = row * CELL + CELL / 2;
+        const o = (row * frame.columns + col) * 3;
+        const fr = frame.colors ? frame.colors[o]     : 230;
+        const fg = frame.colors ? frame.colors[o + 1] : 230;
+        const fb = frame.colors ? frame.colors[o + 2] : 230;
+        const themedStyle = pal.fgFn(fr, fg, fb);
+
+        let alpha = 0;
+        let displayGlyph = glyph;
+        let extraGlow = 0;
+
+        // mask-reveal: realtime spotlight — only cells in cursor radius are visible
+        if (S.hoverMode === 'mask-reveal') {
+          const d = Math.hypot(cellCx - cursorX, cellCy - cursorY);
+          if (d >= radiusPx) continue;
+          alpha = proxFromDist(d, radiusPx);
+          extraGlow = alpha;
+        }
+        // mask-paint: chars fade in when touched, fade out after HOLD time
+        else if (S.hoverMode === 'mask-paint' && maskBuf) {
+          const touchedAt = maskBuf[row * cols + col];
+          if (touchedAt === 0) continue;
+          const age = t - touchedAt;
+          if (age < FADE_IN_S)              alpha = age / FADE_IN_S;
+          else if (age < FADE_IN_S + HOLD_S) alpha = 1;
+          else if (age < FADE_IN_S + HOLD_S + FADE_OUT_S) {
+            const fadeAge = age - FADE_IN_S - HOLD_S;
+            alpha = 1 - fadeAge / FADE_OUT_S;
+          } else continue;
+        }
+        // mask-trail: chars flip-then-settle when touched, then fade away
+        else if (S.hoverMode === 'mask-trail' && maskBuf) {
+          const touchedAt = maskBuf[row * cols + col];
+          if (touchedAt === 0) continue;
+          const age = t - touchedAt;
+          if (age < SETTLE_S) {
+            // Flipping phase
+            const flipPhase = Math.floor(t * M.flipRate);
+            const idx = Math.abs(flipPhase + col * 7 + row * 3) % charset.length;
+            displayGlyph = charset[idx];
+            alpha = Math.min(1, (age / SETTLE_S) * 1.2);
+            extraGlow = 0.6;
+          } else if (age < SETTLE_S + HOLD_S) {
+            alpha = 1;
+          } else if (age < SETTLE_S + HOLD_S + FADE_OUT_S) {
+            alpha = 1 - (age - SETTLE_S - HOLD_S) / FADE_OUT_S;
+          } else continue;
+        }
+        // mask-erase: starts fully visible, cursor erases cells (inverse of paint)
+        else if (S.hoverMode === 'mask-erase' && maskBuf) {
+          const touchedAt = maskBuf[row * cols + col];
+          if (touchedAt === 0) { alpha = 1; }
+          else {
+            const age = t - touchedAt;
+            if (age < FADE_OUT_S) alpha = 1 - age / FADE_OUT_S;
+            else continue; // fully erased — skip
+          }
+        }
+
+        if (alpha <= 0) continue;
+
+        c.save();
+        c.globalAlpha = alpha;
+        if (extraGlow > 0.1) {
+          c.shadowColor = accent2Color;
+          c.shadowBlur = 8 * extraGlow * strength;
+        }
+        c.fillStyle = themedStyle;
+        c.fillText(displayGlyph, col * CELL, row * CELL);
+        c.restore();
+      }
+    }
+
+    // Subtle cursor halo so the user always sees where they're painting
+    if (S.hoverMode !== 'mask-reveal') {
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      const halo = c.createRadialGradient(cursorX, cursorY, 0, cursorX, cursorY, radiusPx);
+      halo.addColorStop(0,    `rgba(${c2R},${c2G},${c2B},0.15)`);
+      halo.addColorStop(0.7,  `rgba(${c2R},${c2G},${c2B},0.04)`);
+      halo.addColorStop(1,    `rgba(${c2R},${c2G},${c2B},0)`);
+      c.fillStyle = halo;
+      c.fillRect(0, 0, cw, ch);
+      c.restore();
+    }
+    return;
+  }
+
   // ─── ⚡ Lightning — electric arcs from cursor to nearby chars ────────────
   if (S.hoverMode === 'lightning') {
     // Spawn new bolts toward random nearby chars (capped)
@@ -2130,6 +2274,7 @@ function startHoverLoop() {
     const TIMED_MODES = new Set([
       'wave', 'glitch', 'comet', 'particles', 'vortex', 'levitate',
       'plasma', 'aurora', 'shockwave', 'lightning',
+      'mask-paint', 'mask-trail', 'mask-erase',   // these animate via fade-out timers
     ]);
     if (S.hoverIdle || TIMED_MODES.has(S.hoverMode) || v > 0.05) {
       if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
