@@ -1,23 +1,23 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>ASCII Studio — turn images into typographic art</title><meta name="description" content="Turn images, GIFs and videos into living ASCII art. Mask reveals, 6 render modes (Halftone, Braille, Bayer dither), 17+ export formats, live webcam input. By Yash Saindane." /><meta name="author" content="Yash Saindane" /><meta name="keywords" content="ASCII art, halftone, dithering, braille art, creative coding, mask reveal, GIF maker, ASCII converter, Yash Saindane" /><meta name="theme-color" content="#4f46e5" /><meta property="og:type" content="website" /><meta property="og:site_name" content="ASCII Studio" /><meta property="og:title" content="ASCII Studio — turn images into typographic art" /><meta property="og:description" content="Mask reveals, 6 render modes (Halftone · Braille · Bayer), 17+ export formats, live webcam input. Built by Yash Saindane." /><meta property="og:url" content="https://yashsaindane.github.io/ascii-studio/" /><meta property="og:image" content="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" /><meta property="og:image:secure_url" content="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" /><meta property="og:image:type" content="image/png" /><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:alt" content="ASCII Studio — by Yash Saindane" /><meta property="og:locale" content="en_US" /><meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="ASCII Studio — turn images into typographic art" /><meta name="twitter:description" content="Mask reveals · 6 render modes · 17+ export formats · live webcam input. Built by @yashsaindane." /><meta name="twitter:image" content="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" /><meta name="twitter:image:alt" content="ASCII Studio — by Yash Saindane" /><meta name="twitter:site" content="@yashsaindane" /><meta name="twitter:creator" content="@yashsaindane" /><meta property="og:image:secure_url" content="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" /><link rel="image_src" href="https://yashsaindane.github.io/ascii-studio/docs/og-image.png" /><link rel="canonical" href="https://yashsaindane.github.io/ascii-studio/" /><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23a855f7'/%3E%3Ctext x='50' y='74' font-family='SF Mono,Menlo,monospace' font-size='62' fill='white' text-anchor='middle' font-weight='700'%3E⠿%3C/text%3E%3C/svg%3E" /><style>
 :root {
-/* Midnight Purple — dark theme */
---bg: #0a0617; /* deep midnight */
---sidebar: #120a24; /* sidebar slightly lifted */
---panel: #1a1033; /* card panel */
---panel-2: #241640; /* hover panel */
---border: #2a1d4a; /* subtle purple border */
---border-2: #3d2c6b;
---accent: #a855f7; /* main violet */
+/* Obsidian — near-black with a whisper of violet */
+--bg: #050307; /* almost true black with violet tint */
+--sidebar: #08060c; /* sidebar barely lifted */
+--panel: #0d0a13; /* panel surface */
+--panel-2: #13101a; /* hover surface */
+--border: #1c1726; /* very subtle border */
+--border-2: #2a2236;
+--accent: #a855f7; /* keep violet bright for contrast */
 --accent2: #d946ef; /* magenta-pink */
---mask: #f59e0b; /* warm amber — pops on purple */
---text: #ede9fe; /* lavender-white */
---muted: #7a6b94;
---label: #b3a7d4;
---value: #c4b5fd;
+--mask: #f59e0b; /* warm amber */
+--text: #d8d2e8; /* cooled lavender-white, less saturated */
+--muted: #5a5468;
+--label: #8a82a0;
+--value: #b8a8e0;
 --danger: #f87171;
 --success: #4ade80;
 --export: #d946ef;
---canvas-bg: #06030f; /* even darker canvas for contrast */
+--canvas-bg: #020104; /* pure black canvas */
 }
 /* Prevent text selection on UI chrome */
 body, #sidebar, #canvasToolbar, .section, .ctrl, .preset-row, .dir-grid,
@@ -58,7 +58,7 @@ padding: 20px 18px 16px;
 border-bottom: 1px solid var(--border);
 flex-shrink: 0;
 background:
-linear-gradient(180deg, rgba(168,85,247,0.10), transparent 80%),
+linear-gradient(180deg, rgba(168,85,247,0.04), transparent 80%),
 var(--sidebar);
 position: relative;
 }
@@ -68,7 +68,7 @@ position: absolute;
 left: 0; right: 0; bottom: 0;
 height: 1px;
 background: linear-gradient(90deg, transparent, var(--accent), transparent);
-opacity: 0.35;
+opacity: 0.18;
 }
 #sidebar-header .logo-row {
 display: flex;
@@ -338,17 +338,17 @@ padding: 8px 12px 8px 8px;
 display: flex;
 align-items: center;
 gap: 10px;
-background: rgba(26,16,51,0.85);
+background: rgba(13,10,19,0.85);
 backdrop-filter: blur(12px) saturate(120%);
 -webkit-backdrop-filter: blur(12px) saturate(120%);
-border: 1px solid var(--border-2);
+border: 1px solid var(--border);
 border-radius: 100px;
-box-shadow: 0 8px 32px rgba(168,85,247,0.18), 0 0 0 1px rgba(168,85,247,0.08);
+box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(168,85,247,0.06);
 transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
 }
 #authorCard:hover {
 transform: translateY(-2px);
-box-shadow: 0 14px 40px rgba(168,85,247,0.32), 0 0 0 1px rgba(217,70,239,0.2);
+box-shadow: 0 14px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(168,85,247,0.18);
 }
 #authorCard .author-glyph {
 width: 30px; height: 30px;
@@ -753,35 +753,35 @@ align-items: center;
 }
 #statusBar.ok { color: var(--success); }
 #statusBar.err { color: var(--danger); }
-/* ── Canvas area — midnight bg with subtle violet dot grid ── */
+/* ── Canvas area — near-black with extremely subtle dot grid ── */
 #canvasArea {
 flex: 1;
 display: flex;
 flex-direction: column;
 background-color: var(--bg);
 background-image:
-radial-gradient(circle at 1px 1px, rgba(168,85,247,0.14) 1px, transparent 0);
-background-size: 22px 22px;
+radial-gradient(circle at 1px 1px, rgba(168,85,247,0.06) 1px, transparent 0);
+background-size: 28px 28px;
 overflow: hidden;
 position: relative;
 }
-/* Soft violet gradient wash at the top */
+/* Subtle violet glow at top — almost invisible */
 #canvasArea::before {
 content: '';
 position: absolute;
 top: 0; left: 0; right: 0;
-height: 120px;
-background: radial-gradient(ellipse at center top, rgba(168,85,247,0.10), transparent 70%);
+height: 160px;
+background: radial-gradient(ellipse at center top, rgba(168,85,247,0.05), transparent 65%);
 pointer-events: none;
 z-index: 0;
 }
-/* Vignette at the bottom edges for premium feel */
+/* Magenta vignette barely-there */
 #canvasArea::after {
 content: '';
 position: absolute;
 bottom: 0; left: 0; right: 0;
-height: 200px;
-background: radial-gradient(ellipse at center bottom, rgba(217,70,239,0.06), transparent 70%);
+height: 240px;
+background: radial-gradient(ellipse at center bottom, rgba(217,70,239,0.03), transparent 70%);
 pointer-events: none;
 z-index: 0;
 }
