@@ -266,7 +266,8 @@ const S = {
     | 'magnet' | 'repel' | 'vortex' | 'wave' | 'levitate'
     | 'spotlight' | 'comet' | 'glitch' | 'particles' | 'tilt'
     | 'plasma' | 'lens' | 'lightning' | 'shockwave' | 'aurora'
-    | 'mask-reveal' | 'mask-paint' | 'mask-trail' | 'mask-erase',
+    | 'mask-reveal' | 'mask-paint' | 'mask-trail' | 'mask-erase'
+    | 'photo-ascii-reveal' | 'photo-ascii-paint' | 'ascii-photo-reveal',
   hoverRadius:   5,
   hoverStrength: 60,
   hoverSmooth:   22,      // cursor lag % (5 = very smooth/laggy, 100 = instant)
@@ -365,6 +366,22 @@ const shockwaves: Array<{ x: number; y: number; t: number; maxR: number }> = [];
 // Lightning bolt segments cached briefly for stability
 type LightningBolt = { from: { x: number; y: number }; to: { x: number; y: number }; midpoints: Array<{ x: number; y: number }>; t: number };
 const lightningBolts: LightningBolt[] = [];
+// Cached HTMLCanvasElement of the current raw frame for fast image draws each tick.
+// Used by photo-ascii-* hover modes. Re-built only when the underlying ImageData changes.
+let rawImgCanvas:    HTMLCanvasElement | null = null;
+let rawImgCanvasFor: ImageData | null = null;
+function getRawImgCanvas(): HTMLCanvasElement | null {
+  const frame = rawFrames[currentFrame] || rawFrames[0];
+  if (!frame) return null;
+  if (rawImgCanvas && rawImgCanvasFor === frame) return rawImgCanvas;
+  const c = document.createElement('canvas');
+  c.width = frame.width; c.height = frame.height;
+  c.getContext('2d')!.putImageData(frame, 0, 0);
+  rawImgCanvas = c;
+  rawImgCanvasFor = frame;
+  return c;
+}
+
 // Mask hover state: per-cell "touched at time" buffer + dims
 let maskBuf:  Float32Array | null = null;
 let maskDims: { rows: number; cols: number } | null = null;
@@ -1837,6 +1854,140 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
     return;
   }
 
+  // ─── 📸 Photo ↔ ASCII hybrid modes ────────────────────────────────────────
+  if (S.hoverMode === 'photo-ascii-reveal' ||
+      S.hoverMode === 'photo-ascii-paint'  ||
+      S.hoverMode === 'ascii-photo-reveal') {
+    const imgCanvas = getRawImgCanvas();
+    if (!imgCanvas) return;
+
+    // Either photo first (image on top), or ASCII first (chars on top)
+    const photoFirst = S.hoverMode !== 'ascii-photo-reveal';
+
+    // 1. Wipe the existing ASCII render from renderFrame()
+    c.fillStyle = pal.bg;
+    c.fillRect(0, 0, cw, ch);
+
+    if (photoFirst) {
+      // Draw the raw photo, scaled to fill the canvas (matches the ASCII grid bounds)
+      c.drawImage(imgCanvas, 0, 0, cw, ch);
+    } else {
+      // ascii-photo-reveal — start with the ASCII art baked underneath
+      c.font = `${CELL}px 'SF Mono','Menlo','Consolas',monospace`;
+      c.textBaseline = 'top';
+      for (let r = 0; r < rows; r++) {
+        const line = lines[r];
+        for (let cc2 = 0; cc2 < line.length; cc2++) {
+          const g = line[cc2];
+          if (g === ' ') continue;
+          const o = (r * frame.columns + cc2) * 3;
+          const fr = frame.colors ? frame.colors[o]     : 230;
+          const fg = frame.colors ? frame.colors[o + 1] : 230;
+          const fb = frame.colors ? frame.colors[o + 2] : 230;
+          c.fillStyle = pal.fgFn(fr, fg, fb);
+          c.fillText(g, cc2 * CELL, r * CELL);
+        }
+      }
+    }
+
+    // 2. Paint-mode: track which cells the cursor has touched + when
+    if (S.hoverMode === 'photo-ascii-paint') {
+      ensureMaskBuf(rows, cols);
+      const minCol = Math.max(0, Math.floor((cursorX - radiusPx) / CELL));
+      const maxCol = Math.min(cols - 1, Math.ceil((cursorX + radiusPx) / CELL));
+      const minRow = Math.max(0, Math.floor((cursorY - radiusPx) / CELL));
+      const maxRow = Math.min(rows - 1, Math.ceil((cursorY + radiusPx) / CELL));
+      for (let row = minRow; row <= maxRow; row++) {
+        for (let col = minCol; col <= maxCol; col++) {
+          const ccx = col * CELL + CELL / 2;
+          const ccy = row * CELL + CELL / 2;
+          if (Math.hypot(ccx - cursorX, ccy - cursorY) <= radiusPx) {
+            maskBuf![row * cols + col] = t;
+          }
+        }
+      }
+    }
+
+    // 3. Render the OPPOSITE thing where the cursor is hovering
+    // photoFirst: draw ASCII chars on top, in cursor radius
+    // !photoFirst: draw photo patches on top, in cursor radius
+    c.font = `${CELL}px 'SF Mono','Menlo','Consolas',monospace`;
+    c.textBaseline = 'top';
+    const FADE_IN_S  = 0.18 / speed;
+    const HOLD_S     = 1.3  / speed;
+    const FADE_OUT_S = 0.55 / speed;
+
+    for (let row = 0; row < rows; row++) {
+      const line = lines[row];
+      for (let col = 0; col < line.length; col++) {
+        const glyph = line[col];
+        if (glyph === ' ') continue;
+        const cellX  = col * CELL;
+        const cellY  = row * CELL;
+        const cellCx = cellX + CELL / 2;
+        const cellCy = cellY + CELL / 2;
+        const dist   = Math.hypot(cellCx - cursorX, cellCy - cursorY);
+
+        let alpha = 0;
+        if (S.hoverMode === 'photo-ascii-paint' && maskBuf) {
+          // Paint mode: alpha based on touch age
+          const touchedAt = maskBuf[row * cols + col];
+          if (touchedAt === 0) continue;
+          const age = t - touchedAt;
+          if (age < FADE_IN_S)              alpha = age / FADE_IN_S;
+          else if (age < FADE_IN_S + HOLD_S) alpha = 1;
+          else if (age < FADE_IN_S + HOLD_S + FADE_OUT_S) {
+            alpha = 1 - (age - FADE_IN_S - HOLD_S) / FADE_OUT_S;
+          } else continue;
+        } else {
+          // Realtime reveal: alpha from proximity to cursor
+          if (dist > radiusPx) continue;
+          alpha = proxFromDist(dist, radiusPx);
+        }
+        if (alpha <= 0.01) continue;
+
+        if (photoFirst) {
+          // Photo is base, ASCII appears under cursor — fade in cell bg + glyph
+          const o  = (row * frame.columns + col) * 3;
+          const fr = frame.colors ? frame.colors[o]     : 230;
+          const fg = frame.colors ? frame.colors[o + 1] : 230;
+          const fb = frame.colors ? frame.colors[o + 2] : 230;
+          // Darken the patch first (so photo doesn't bleed through brightly)
+          c.fillStyle = pal.bg;
+          c.globalAlpha = alpha;
+          c.fillRect(cellX - 1, cellY - 1, CELL + 2, CELL + 2);
+          // Draw the themed glyph on top
+          c.globalAlpha = alpha;
+          c.fillStyle = pal.fgFn(fr, fg, fb);
+          c.fillText(glyph, cellX, cellY);
+          c.globalAlpha = 1;
+        } else {
+          // ASCII is base, photo shows through under cursor — sample image
+          // Compute source pixel from image to overlay this cell area
+          const sx = Math.floor((cellX / cw) * imgCanvas.width);
+          const sy = Math.floor((cellY / ch) * imgCanvas.height);
+          const sw = Math.max(1, Math.ceil((CELL / cw) * imgCanvas.width));
+          const sh = Math.max(1, Math.ceil((CELL / ch) * imgCanvas.height));
+          c.globalAlpha = alpha;
+          c.drawImage(imgCanvas, sx, sy, sw, sh, cellX, cellY, CELL, CELL);
+          c.globalAlpha = 1;
+        }
+      }
+    }
+
+    // 4. Subtle cursor ring so you always see where the brush is
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    const ring = c.createRadialGradient(cursorX, cursorY, radiusPx * 0.85, cursorX, cursorY, radiusPx * 1.05);
+    ring.addColorStop(0, `rgba(${cR},${cG},${cB},0)`);
+    ring.addColorStop(0.6, `rgba(${cR},${cG},${cB},0.18)`);
+    ring.addColorStop(1, `rgba(${cR},${cG},${cB},0)`);
+    c.fillStyle = ring;
+    c.fillRect(0, 0, cw, ch);
+    c.restore();
+    return;
+  }
+
   // ─── 🎭 Mask hover modes — paint/reveal/erase the ASCII with the cursor ──
   if (S.hoverMode === 'mask-reveal' || S.hoverMode === 'mask-paint' ||
       S.hoverMode === 'mask-trail'  || S.hoverMode === 'mask-erase') {
@@ -2266,7 +2417,8 @@ function startHoverLoop() {
     const TIMED_MODES = new Set([
       'wave', 'glitch', 'comet', 'particles', 'vortex', 'levitate',
       'plasma', 'aurora', 'shockwave', 'lightning',
-      'mask-paint', 'mask-trail', 'mask-erase',   // these animate via fade-out timers
+      'mask-paint', 'mask-trail', 'mask-erase',     // mask fade-out timers
+      'photo-ascii-paint',                          // photo paint fades like mask-paint
     ]);
     if (S.hoverIdle || TIMED_MODES.has(S.hoverMode) || v > 0.05) {
       if (M.progress > 0 && M.progress < 1) renderAtProgress(M.progress);
