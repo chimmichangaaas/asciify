@@ -743,20 +743,74 @@ window.addEventListener('mousemove', e => {
   compareCanvas.style.clipPath = `inset(0 0 0 ${pct}%)`;
 });
 
-// ── Share via URL hash ────────────────────────────────────────────────────────
+// ── Share via URL hash + share modal ─────────────────────────────────────────
 
-btnShare.addEventListener('click', async () => {
+// Public URL where the dashboard is hosted. When the page is opened over file://
+// (i.e. running locally), shared links won't work for OG previews, so we fall
+// back to this canonical URL so previews still render correctly when posted.
+const PUBLIC_URL = 'https://yashsaindane.github.io/ascii-studio/';
+
+function buildShareUrl(): string {
   const state = { S, M: { ...M, paintTimings: M.paintTimings ? Array.from(M.paintTimings.entries()) : null } };
-  const json = JSON.stringify(state);
-  const b64  = btoa(unescape(encodeURIComponent(json)));
-  const url  = `${location.origin}${location.pathname}#${b64}`;
+  const json  = JSON.stringify(state);
+  const b64   = btoa(unescape(encodeURIComponent(json)));
+  const base  = (location.protocol === 'file:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? PUBLIC_URL
+    : `${location.origin}${location.pathname}`;
+  return `${base}#${b64}`;
+}
+
+const shareBackdrop   = document.getElementById('shareBackdrop')!;
+const shareCloseBtn   = document.getElementById('shareClose')!;
+const shareDismissBtn = document.getElementById('shareDismiss')!;
+const shareLinkInput  = document.getElementById('shareLinkInput') as HTMLInputElement;
+const shareCopyBtn    = document.getElementById('shareCopyBtn') as HTMLButtonElement;
+
+btnShare.addEventListener('click', () => {
+  const url = buildShareUrl();
+  shareLinkInput.value = url;
+  shareBackdrop.style.display = 'flex';
+  // Auto-select for quick keyboard copy
+  setTimeout(() => { shareLinkInput.focus(); shareLinkInput.select(); }, 100);
+});
+
+function hideShare() { shareBackdrop.style.display = 'none'; }
+shareCloseBtn.addEventListener('click', hideShare);
+shareDismissBtn.addEventListener('click', hideShare);
+shareBackdrop.addEventListener('click', e => { if (e.target === shareBackdrop) hideShare(); });
+
+shareCopyBtn.addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText(url);
-    setStatus('✓ Share link copied to clipboard', 'ok');
+    await navigator.clipboard.writeText(shareLinkInput.value);
+    shareCopyBtn.textContent = '✓ Copied';
+    shareCopyBtn.classList.add('copied');
+    setTimeout(() => {
+      shareCopyBtn.textContent = 'Copy';
+      shareCopyBtn.classList.remove('copied');
+    }, 1800);
   } catch {
-    location.hash = b64;
-    setStatus('Link in URL bar — copy it', 'ok');
+    shareLinkInput.select();
+    document.execCommand('copy');
+    shareCopyBtn.textContent = '✓ Copied';
+    setTimeout(() => { shareCopyBtn.textContent = 'Copy'; }, 1800);
   }
+});
+
+// Social share buttons
+document.querySelectorAll<HTMLButtonElement>('.share-social').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const net = btn.dataset.net!;
+    const url = encodeURIComponent(shareLinkInput.value);
+    const text = encodeURIComponent('Just made some ASCII art with ASCII Studio by @yashsaindane');
+    let target = '';
+    switch (net) {
+      case 'x':        target = `https://twitter.com/intent/tweet?text=${text}&url=${url}`; break;
+      case 'linkedin': target = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`; break;
+      case 'reddit':   target = `https://reddit.com/submit?url=${url}&title=${encodeURIComponent('ASCII Studio — typographic art tool')}`; break;
+      case 'whatsapp': target = `https://wa.me/?text=${text}%20${url}`; break;
+    }
+    if (target) window.open(target, '_blank', 'noopener,width=600,height=560');
+  });
 });
 
 function loadFromHash() {

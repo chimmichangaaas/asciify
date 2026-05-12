@@ -2,7 +2,41 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>ASCII Studio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASCII Studio — turn images into typographic art</title>
+
+  <!-- SEO -->
+  <meta name="description" content="Turn images, GIFs and videos into living ASCII art. Mask reveals, 6 render modes (Halftone, Braille, Bayer dither), 17+ export formats, live webcam input. By Yash Saindane." />
+  <meta name="author" content="Yash Saindane" />
+  <meta name="keywords" content="ASCII art, halftone, dithering, braille art, creative coding, mask reveal, GIF maker, ASCII converter, Yash Saindane" />
+  <meta name="theme-color" content="#4f46e5" />
+
+  <!-- Open Graph (Facebook, LinkedIn, Discord, iMessage, Slack) -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:site_name"   content="ASCII Studio" />
+  <meta property="og:title"       content="ASCII Studio — turn images into typographic art" />
+  <meta property="og:description" content="Mask reveals, 6 render modes (Halftone · Braille · Bayer), 17+ export formats, live webcam input. Built by Yash Saindane." />
+  <meta property="og:url"         content="https://yashsaindane.github.io/ascii-studio/" />
+  <meta property="og:image"       content="https://yashsaindane.github.io/ascii-studio/docs/og-image.svg" />
+  <meta property="og:image:type"  content="image/svg+xml" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt"   content="ASCII Studio — by Yash Saindane" />
+  <meta property="og:locale"      content="en_US" />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content="ASCII Studio — turn images into typographic art" />
+  <meta name="twitter:description" content="Mask reveals · 6 render modes · 17+ export formats · live webcam input. Built by @yashsaindane." />
+  <meta name="twitter:image"       content="https://yashsaindane.github.io/ascii-studio/docs/og-image.svg" />
+  <meta name="twitter:site"        content="@yashsaindane" />
+  <meta name="twitter:creator"     content="@yashsaindane" />
+
+  <!-- Canonical -->
+  <link rel="canonical" href="https://yashsaindane.github.io/ascii-studio/" />
+
+  <!-- Favicon (inline SVG) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%234f46e5'/%3E%3Ctext x='50' y='74' font-family='SF Mono,Menlo,monospace' font-size='62' fill='white' text-anchor='middle' font-weight='700'%3E⠿%3C/text%3E%3C/svg%3E" />
   <style>
     :root {
       --bg:       #faf9f6;   /* warm off-white */
@@ -521,6 +555,92 @@
       padding: 4px 8px;
     }
     .modal-dismiss:hover { color: var(--text); }
+
+    /* Share modal specifics */
+    .share-card { max-width: 460px; }
+    .share-preview {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 10px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin: 4px 0 16px;
+    }
+    .share-preview img {
+      width: 100px;
+      height: 52px;
+      border-radius: 6px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: #0a0a0e;
+    }
+    .share-preview-text { flex: 1; text-align: left; min-width: 0; }
+    .share-preview-title {
+      font: 700 13px/1.2 inherit;
+      color: var(--text);
+    }
+    .share-preview-desc {
+      font: 11px/1.4 inherit;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .share-link-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .share-link-row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1.5px solid var(--border-2);
+      border-radius: 8px;
+      background: var(--bg);
+      font: 11px/1 'SF Mono','Menlo',monospace;
+      color: var(--text);
+      outline: none;
+    }
+    .share-link-row input:focus { border-color: var(--accent); }
+    .share-copy-btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font: 600 12px/1 inherit;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: transform 0.1s, box-shadow 0.15s;
+    }
+    .share-copy-btn:hover { box-shadow: 0 4px 12px rgba(79,70,229,0.3); }
+    .share-copy-btn:active { transform: scale(0.96); }
+    .share-copy-btn.copied { background: linear-gradient(135deg, var(--success), #16a34a); }
+
+    .share-socials {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 6px;
+    }
+    .share-social {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--sidebar);
+      color: var(--label);
+      font: 700 15px/1 inherit;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .share-social:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 10px rgba(79,70,229,0.18);
+    }
+    .share-social svg { display: block; }
 
     /* ── Control row ── */
     .ctrl {
@@ -1349,6 +1469,43 @@
       <button type="submit" class="modal-cta">Subscribe</button>
     </form>
     <button type="button" class="modal-dismiss" id="newsletterDismiss">No thanks</button>
+  </div>
+</div>
+
+<!-- ── Share Modal ─────────────────────────────────────────────────────── -->
+<div id="shareBackdrop" class="modal-backdrop" style="display:none;">
+  <div class="modal-card share-card" role="dialog" aria-label="Share your ASCII creation">
+    <button class="modal-close" id="shareClose" aria-label="Close">×</button>
+    <div class="modal-mark">⠿</div>
+    <h2 class="modal-title">Share your creation</h2>
+    <p class="modal-body">This link bundles every setting — direction, theme, paint, exports.<br/>Anyone who opens it lands on your exact configuration.</p>
+
+    <!-- Preview card -->
+    <div class="share-preview">
+      <img src="docs/og-image.svg" alt="ASCII Studio preview" id="sharePreviewImg" onerror="this.style.display='none'"/>
+      <div class="share-preview-text">
+        <div class="share-preview-title">ASCII Studio</div>
+        <div class="share-preview-desc">by Yash Saindane · @yashsaindane</div>
+      </div>
+    </div>
+
+    <!-- Link + copy -->
+    <div class="share-link-row">
+      <input type="text" id="shareLinkInput" readonly />
+      <button id="shareCopyBtn" class="share-copy-btn">Copy</button>
+    </div>
+
+    <!-- Social share buttons -->
+    <div class="share-socials">
+      <button class="share-social" data-net="x"        title="Share on X">𝕏</button>
+      <button class="share-social" data-net="linkedin" title="Share on LinkedIn">in</button>
+      <button class="share-social" data-net="reddit"   title="Share on Reddit">r/</button>
+      <button class="share-social" data-net="whatsapp" title="Share on WhatsApp">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.6 2.3A7.9 7.9 0 008 0a8 8 0 00-6.8 12.1L0 16l4-1a8 8 0 0011.6-6.8c0-2.1-.8-4.1-2-5.9zM8 14.6a6.6 6.6 0 01-3.4-.9l-.2-.2-2.4.6.6-2.3-.2-.2A6.6 6.6 0 1114.6 8c0 3.6-3 6.6-6.6 6.6zm3.6-4.9c-.2-.1-1.2-.6-1.4-.6-.2 0-.3 0-.5.2-.1.2-.5.6-.6.8-.1.1-.2.1-.4 0-.2-.1-.8-.3-1.6-.9-.6-.5-1-1.2-1.1-1.4-.1-.2 0-.3.1-.4l.3-.4c.1-.1.1-.2.2-.4 0-.1 0-.3 0-.4l-.6-1.4c-.2-.4-.3-.3-.5-.3h-.4c-.1 0-.4 0-.5.2-.2.2-.7.7-.7 1.7s.7 2 .8 2.1c.1.1 1.5 2.4 3.6 3.3 1.7.7 2 .6 2.4.5.4 0 1.2-.5 1.4-1 .2-.4.2-.8.1-.9 0 0-.2-.1-.4-.2z"/></svg>
+      </button>
+    </div>
+
+    <button type="button" class="modal-dismiss" id="shareDismiss">Close</button>
   </div>
 </div>
 
