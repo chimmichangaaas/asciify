@@ -41,54 +41,114 @@ overflow: hidden;
 body { display: flex; height: 100vh; }
 /* ── Sidebar ── */
 #sidebar {
-width: 280px;
-min-width: 280px;
+width: 288px;
+min-width: 288px;
 background: var(--sidebar);
 border-right: 1px solid var(--border);
 display: flex;
 flex-direction: column;
 overflow: hidden;
+box-shadow: 1px 0 4px rgba(20,20,30,0.04);
+position: relative;
+z-index: 3;
 }
 #sidebar-header {
-padding: 18px 18px 14px;
+padding: 20px 18px 16px;
 border-bottom: 1px solid var(--border);
 flex-shrink: 0;
+background:
+linear-gradient(180deg, rgba(79,70,229,0.05), transparent 80%),
+var(--sidebar);
+position: relative;
 }
+#sidebar-header::after {
+content: '';
+position: absolute;
+left: 0; right: 0; bottom: 0;
+height: 1px;
+background: linear-gradient(90deg, transparent, var(--border), transparent);
+}
+#sidebar-header .logo-row {
+display: flex;
+align-items: center;
+gap: 11px;
+}
+#sidebar-header .logo-mark {
+width: 36px; height: 36px;
+border-radius: 9px;
+background: linear-gradient(135deg, var(--accent), var(--accent2));
+color: #fff;
+font: 700 18px/1 'SF Mono','Menlo',monospace;
+display: flex; align-items: center; justify-content: center;
+box-shadow:
+0 6px 16px rgba(79,70,229,0.28),
+inset 0 1px 0 rgba(255,255,255,0.2);
+flex-shrink: 0;
+}
+#sidebar-header .title-stack { display: flex; flex-direction: column; min-width: 0; }
 #sidebar-header h1 {
-font-size: 13px;
+font-size: 15px;
 font-weight: 700;
-letter-spacing: 0.12em;
-color: var(--text);
-text-transform: uppercase;
+letter-spacing: 0.04em;
+background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+-webkit-background-clip: text;
+background-clip: text;
+-webkit-text-fill-color: transparent;
+color: transparent;
+text-transform: none;
+line-height: 1.1;
 }
 #sidebar-header p {
 font-size: 10px;
 color: var(--muted);
 margin-top: 3px;
-letter-spacing: 0.04em;
+letter-spacing: 0.06em;
+text-transform: uppercase;
+}
+#sidebar-header .version-pill {
+display: inline-block;
+margin-top: 2px;
+padding: 1px 6px;
+font: 600 8px/1.5 'SF Mono','Menlo',monospace;
+letter-spacing: 0.08em;
+color: var(--accent);
+background: rgba(79,70,229,0.08);
+border: 1px solid rgba(79,70,229,0.2);
+border-radius: 4px;
+width: fit-content;
 }
 #sidebar-scroll {
 flex: 1;
 overflow-y: auto;
 padding: 10px 0 20px;
 }
-#sidebar-scroll::-webkit-scrollbar { width: 3px; }
+#sidebar-scroll::-webkit-scrollbar { width: 4px; }
 #sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
-#sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-/* ── Drop zone ── */
+#sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+#sidebar-scroll::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+/* ── Drop zone — soft gradient + hover glow ── */
 #dropZone {
 margin: 10px 14px;
-border: 1.5px dashed var(--border);
-border-radius: 8px;
-padding: 14px 12px;
+border: 1.5px dashed var(--border-2);
+border-radius: 10px;
+padding: 16px 12px;
 text-align: center;
 cursor: pointer;
-transition: all 0.15s;
-background: var(--panel);
+transition: border-color 0.18s, background 0.18s, box-shadow 0.18s, transform 0.12s;
+background: linear-gradient(135deg, rgba(79,70,229,0.025), rgba(124,58,237,0.025));
 position: relative;
 overflow: hidden;
 }
-#dropZone:hover, #dropZone.drag { border-color: var(--accent); background: rgba(79,128,255,0.06); }
+#dropZone:hover {
+border-color: var(--accent);
+background: linear-gradient(135deg, rgba(79,70,229,0.06), rgba(124,58,237,0.06));
+box-shadow: 0 4px 14px rgba(79,70,229,0.12);
+}
+#dropZone.drag {
+border-color: var(--accent);
+background: linear-gradient(135deg, rgba(79,70,229,0.12), rgba(124,58,237,0.12));
+transform: scale(1.01);
+}
 #dropZone img { width: 100%; height: 80px; object-fit: contain; display: none; border-radius: 4px; margin-bottom: 6px; }
 #dropZone .drop-label { font-size: 11px; color: var(--label); line-height: 1.4; }
 #dropZone .drop-label span { color: var(--accent); font-weight: 600; }
@@ -97,13 +157,31 @@ overflow: hidden;
 /* ── Section ── */
 .section { padding: 10px 14px 0; }
 .section-title {
-font-size: 9px;
+font-size: 10px;
 font-weight: 700;
 letter-spacing: 0.14em;
 text-transform: uppercase;
 color: var(--accent);
-padding: 6px 0 8px;
+padding: 10px 0 10px 10px;
+margin-top: 4px;
 border-top: 1px solid var(--border);
+position: relative;
+display: flex;
+align-items: center;
+gap: 6px;
+}
+.section-title::before {
+content: '';
+position: absolute;
+left: 0;
+top: 50%;
+width: 3px;
+height: 14px;
+background: currentColor;
+border-radius: 2px;
+transform: translateY(-50%);
+box-shadow: 0 0 8px currentColor;
+opacity: 0.85;
 }
 .section-title.purple { color: var(--accent2); }
 .section-title.green { color: var(--success); }
@@ -121,42 +199,55 @@ gap: 4px;
 margin: 4px 0 10px;
 }
 .dir-btn {
-background: var(--panel);
+background: var(--sidebar);
 border: 1px solid var(--border);
 color: var(--label);
 font: 14px/1 inherit;
-height: 28px;
-border-radius: 5px;
+height: 30px;
+border-radius: 6px;
 cursor: pointer;
-transition: all 0.12s;
+transition: all 0.15s ease-out;
 display: flex; align-items: center; justify-content: center;
 }
-.dir-btn:hover { border-color: var(--mask); color: var(--mask); }
-.dir-btn.active {
-background: rgba(255,128,80,0.15);
+.dir-btn:hover {
 border-color: var(--mask);
 color: var(--mask);
-box-shadow: 0 0 0 1px var(--mask) inset;
+transform: translateY(-1px);
+box-shadow: 0 2px 6px rgba(234,88,12,0.15);
 }
-/* Preset chips */
+.dir-btn.active {
+background: linear-gradient(135deg, var(--mask), #c2410c);
+border-color: transparent;
+color: #fff;
+box-shadow: 0 3px 10px rgba(234,88,12,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
+transform: translateY(-1px);
+}
+/* Preset chips — refined w/ gradient hover */
 .preset-row {
 display: flex;
 flex-wrap: wrap;
-gap: 4px;
+gap: 5px;
 margin: 6px 0 10px;
 }
 .preset-chip {
-padding: 4px 9px;
+padding: 5px 10px;
 font: 10px/1.4 inherit;
+font-weight: 600;
 letter-spacing: 0.03em;
 border: 1px solid var(--border);
-border-radius: 12px;
-background: var(--panel);
+border-radius: 14px;
+background: var(--sidebar);
 color: var(--label);
 cursor: pointer;
-transition: all 0.12s;
+transition: all 0.15s ease-out;
 }
-.preset-chip:hover { border-color: var(--mask); color: var(--mask); }
+.preset-chip:hover {
+border-color: var(--mask);
+color: #fff;
+background: linear-gradient(135deg, var(--mask), #c2410c);
+box-shadow: 0 3px 10px rgba(234,88,12,0.25);
+transform: translateY(-1px);
+}
 /* Color picker */
 input[type=color] {
 width: 36px;
@@ -373,52 +464,72 @@ font-weight: 600;
 min-width: 36px;
 text-align: right;
 }
-/* Slider */
+/* Slider — polished w/ accent-color + bigger thumb */
 input[type=range] {
 -webkit-appearance: none;
 width: 100%;
-height: 3px;
+height: 4px;
 background: var(--border);
-border-radius: 2px;
+border-radius: 3px;
 outline: none;
+accent-color: var(--accent);
+cursor: pointer;
+}
+input[type=range]::-webkit-slider-runnable-track {
+height: 4px;
+background: var(--border);
+border-radius: 3px;
 }
 input[type=range]::-webkit-slider-thumb {
 -webkit-appearance: none;
-width: 12px;
-height: 12px;
+width: 14px;
+height: 14px;
 border-radius: 50%;
-background: var(--accent);
+background: #fff;
+border: 2px solid var(--accent);
+box-shadow: 0 2px 6px rgba(79,70,229,0.25), 0 1px 2px rgba(0,0,0,0.06);
 cursor: pointer;
-transition: transform 0.1s;
+transition: transform 0.12s ease-out, box-shadow 0.12s ease-out;
+margin-top: -5px;
 }
-input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+input[type=range]::-webkit-slider-thumb:hover {
+transform: scale(1.18);
+box-shadow: 0 4px 12px rgba(79,70,229,0.4), 0 0 0 6px rgba(79,70,229,0.08);
+}
+input[type=range]::-webkit-slider-thumb:active {
+transform: scale(1.1);
+}
 .ctrl-slider { flex-direction: column; align-items: stretch; }
 .ctrl-slider .ctrl-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
 .ctrl-slider .ctrl-head label { font-size: 11px; color: var(--label); }
 .ctrl-slider .ctrl-head .val { font-size: 11px; color: var(--value); font-weight: 600; }
-/* Toggle */
-.toggle-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+/* Toggle — soft with gradient + glow when on */
+.toggle-wrap { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
 .toggle-wrap label { font-size: 11px; color: var(--label); }
 .toggle {
-width: 32px; height: 17px;
-background: var(--border);
-border-radius: 9px;
+width: 34px; height: 18px;
+background: var(--border-2);
+border-radius: 10px;
 position: relative;
 cursor: pointer;
-transition: background 0.2s;
+transition: background 0.22s ease, box-shadow 0.22s ease;
 flex-shrink: 0;
 }
-.toggle.on { background: var(--accent); }
+.toggle.on {
+background: linear-gradient(135deg, var(--accent), var(--accent2));
+box-shadow: 0 2px 8px rgba(79,70,229,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
+}
 .toggle::after {
 content: '';
 position: absolute;
-width: 13px; height: 13px;
+width: 14px; height: 14px;
 background: #fff;
 border-radius: 50%;
 top: 2px; left: 2px;
-transition: left 0.2s;
+box-shadow: 0 1px 3px rgba(0,0,0,0.18), 0 1px 1px rgba(0,0,0,0.06);
+transition: left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.toggle.on::after { left: 17px; }
+.toggle.on::after { left: 18px; }
 /* Text input */
 .ctrl input[type=text], .ctrl select {
 background: var(--panel);
@@ -443,25 +554,51 @@ font-family: inherit;
 cursor: pointer;
 }
 .ctrl select option { background: var(--panel-2); color: var(--text); }
-/* Buttons */
+/* Buttons — gradient primaries, lift on hover, scale on press */
 .btn-row { display: flex; gap: 8px; margin-top: 4px; }
 .btn {
 flex: 1;
-padding: 8px 4px;
+padding: 9px 4px;
 border: none;
-border-radius: 6px;
+border-radius: 7px;
 font: 600 11px/1 inherit;
 cursor: pointer;
 letter-spacing: 0.03em;
-transition: opacity 0.15s, transform 0.1s;
+transition: transform 0.12s ease-out, box-shadow 0.18s ease-out, background 0.15s, opacity 0.15s;
+position: relative;
 }
-.btn:hover { opacity: 0.88; }
-.btn:active { transform: scale(0.97); }
-.btn-primary { background: var(--accent); color: #fff; }
-.btn-secondary { background: var(--panel); color: var(--label); border: 1px solid var(--border); }
-.btn-export { background: var(--export); color: #fff; }
+.btn:active:not(:disabled) { transform: scale(0.96); }
+.btn-primary {
+background: linear-gradient(135deg, var(--accent), var(--accent2));
+color: #fff;
+box-shadow: 0 2px 8px rgba(79,70,229,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.btn-primary:hover:not(:disabled) {
+transform: translateY(-1px);
+box-shadow: 0 6px 18px rgba(79,70,229,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
+}
+.btn-secondary {
+background: var(--sidebar);
+color: var(--text);
+border: 1px solid var(--border);
+box-shadow: 0 1px 2px rgba(20,20,30,0.04);
+}
+.btn-secondary:hover:not(:disabled) {
+border-color: var(--accent);
+color: var(--accent);
+box-shadow: 0 2px 6px rgba(79,70,229,0.12);
+}
+.btn-export {
+background: linear-gradient(135deg, var(--export), #5b21b6);
+color: #fff;
+box-shadow: 0 2px 8px rgba(124,58,237,0.25), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.btn-export:hover:not(:disabled) {
+transform: translateY(-1px);
+box-shadow: 0 6px 18px rgba(124,58,237,0.35), inset 0 1px 0 rgba(255,255,255,0.18);
+}
 .btn-reset { background: var(--panel); color: var(--danger); border: 1px solid var(--border); }
-.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Status */
 #statusBar {
 padding: 8px 14px;
@@ -475,14 +612,27 @@ align-items: center;
 }
 #statusBar.ok { color: var(--success); }
 #statusBar.err { color: var(--danger); }
-/* ── Canvas area ── */
+/* ── Canvas area — subtle dot grid background ── */
 #canvasArea {
 flex: 1;
 display: flex;
 flex-direction: column;
-background: var(--bg);
+background-color: var(--bg);
+background-image:
+radial-gradient(circle at 1px 1px, rgba(79,70,229,0.08) 1px, transparent 0);
+background-size: 22px 22px;
 overflow: hidden;
-position: relative; /* anchor for floating #authorCard */
+position: relative;
+}
+/* Soft gradient wash at the top */
+#canvasArea::before {
+content: '';
+position: absolute;
+top: 0; left: 0; right: 0;
+height: 80px;
+background: linear-gradient(180deg, rgba(124,58,237,0.04), transparent);
+pointer-events: none;
+z-index: 0;
 }
 #canvasToolbar {
 padding: 10px 16px;
@@ -492,21 +642,40 @@ align-items: center;
 gap: 10px;
 flex-shrink: 0;
 }
-#canvasToolbar .info { flex: 1; font-size: 10px; color: var(--muted); }
-.zoom-ctrl { display: flex; align-items: center; gap: 6px; }
-.zoom-btn {
-width: 22px; height: 22px;
-border: 1px solid var(--border);
-border-radius: 4px;
+#canvasToolbar {
+background: var(--sidebar);
+backdrop-filter: blur(8px);
+-webkit-backdrop-filter: blur(8px);
+position: relative;
+z-index: 2;
+}
+#canvasToolbar .info { flex: 1; font-size: 11px; color: var(--muted); font-weight: 500; }
+.zoom-ctrl {
+display: flex;
+align-items: center;
+gap: 4px;
+padding: 3px;
 background: var(--panel);
+border-radius: 8px;
+border: 1px solid var(--border);
+}
+.zoom-btn {
+width: 24px; height: 24px;
+border: none;
+border-radius: 5px;
+background: transparent;
 color: var(--label);
-font: 14px/1 monospace;
+font: 600 14px/1 monospace;
 cursor: pointer;
 display: flex; align-items: center; justify-content: center;
 transition: all 0.12s;
 }
-.zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
-#zoomLabel { font-size: 11px; color: var(--value); font-weight: 600; min-width: 34px; text-align: center; }
+.zoom-btn:hover {
+background: var(--sidebar);
+color: var(--accent);
+box-shadow: 0 1px 3px rgba(20,20,30,0.08);
+}
+#zoomLabel { font-size: 11px; color: var(--value); font-weight: 700; min-width: 38px; text-align: center; }
 #canvasWrap {
 flex: 1;
 overflow: auto;
@@ -515,6 +684,7 @@ align-items: flex-start;
 justify-content: flex-start;
 padding: 24px;
 position: relative;
+z-index: 1;
 }
 #canvasWrap::-webkit-scrollbar { width: 6px; height: 6px; }
 #canvasWrap::-webkit-scrollbar-track { background: transparent; }
@@ -635,7 +805,7 @@ display: flex; align-items: center; justify-content: center;
 flex-shrink: 0;
 }
 #playBtn:hover { border-color: var(--accent); }
-</style></head><body><aside id="sidebar"><div id="sidebar-header"><h1>ASCII Studio</h1><p>Standalone preview &amp; export</p></div><div id="sidebar-scroll"><div class="section"><div id="dropZone"><img id="thumbImg" alt="" /><div class="drop-label"><span>Click or drop</span> image, GIF or video</div><div class="file-name" id="dropFileName"></div></div><input type="file" id="fileInput" accept="image/*,video/*,.gif" /></div><div class="section" style="display:flex; gap:6px; padding-top:8px;"><button class="btn btn-secondary" id="btnWebcam" style="font-size:10px; padding:6px 4px;">📷 Webcam</button><button class="btn btn-secondary" id="btnCompare" style="font-size:10px; padding:6px 4px;">↔ Compare</button><button class="btn btn-secondary" id="btnShare" style="font-size:10px; padding:6px 4px;">🔗 Share</button></div><div class="section"><div class="section-title">Character Set</div><div class="ctrl"><label>Render Mode</label><select id="renderModeSelect"><option value="ascii">ASCII Chars</option><option value="halftone">Halftone Dots</option><option value="block">Block Pixels</option><option value="geometric">Geometric</option><option value="braille">Braille (8× density)</option><option value="bayer">Bayer Dither</option></select></div><div class="ctrl" id="rampRow"><label>Ramp</label><input type="text" id="ramp" value="@X&amp;$#x*+=-. " maxlength="32" style="max-width:130px;" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Width</label><span class="val" id="widthVal">130</span></div><input type="range" id="widthSlider" min="20" max="220" step="5" value="130" /></div></div><div class="section"><div class="section-title">Image Adjustments</div><div class="toggle-wrap"><label>Color</label><div class="toggle on" id="colorToggle" data-key="color"></div></div><div class="toggle-wrap"><label>Invert</label><div class="toggle on" id="invertToggle" data-key="invert"></div></div><div class="toggle-wrap"><label>Auto Contrast</label><div class="toggle on" id="autoContrastToggle" data-key="autoContrast"></div></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Cell Aspect</label><span class="val" id="cellAspectVal">1.00</span></div><input type="range" id="cellAspectSlider" min="0.3" max="2.0" step="0.05" value="1.0" /></div><div class="toggle-wrap"><label>Edge Detection</label><div class="toggle" id="edgeToggle" data-key="edgeOn"></div></div><div class="ctrl-slider ctrl" id="edgeRow" style="display:none;"><div class="ctrl-head"><label>Edge Threshold</label><span class="val" id="edgeVal">40</span></div><input type="range" id="edgeSlider" min="1" max="120" step="1" value="40" /></div></div><div class="section"><div class="section-title">🎨 Color Theme</div><div class="preset-row" id="themeRow"><button class="preset-chip active" data-theme="auto">Auto</button><button class="preset-chip" data-theme="matrix">Matrix</button><button class="preset-chip" data-theme="amber">Amber</button><button class="preset-chip" data-theme="cyber">Cyber</button><button class="preset-chip" data-theme="mono">Mono</button><button class="preset-chip" data-theme="sepia">Sepia</button><button class="preset-chip" data-theme="custom">Custom</button></div><div id="customThemeBox" style="display:none;"><div class="ctrl"><label>Foreground</label><input type="color" id="themeFg" value="#e6e6e6" /></div><div class="ctrl"><label>Background</label><input type="color" id="themeBg" value="#0a0a0c" /></div></div></div><div class="section"><div class="section-title">🪟 Overlay</div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Scanlines</label><span class="val" id="scanlinesVal">0%</span></div><input type="range" id="scanlinesSlider" min="0" max="100" step="5" value="0" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Vignette</label><span class="val" id="vignetteVal">0%</span></div><input type="range" id="vignetteSlider" min="0" max="100" step="5" value="0" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Grain</label><span class="val" id="grainVal">0%</span></div><input type="range" id="grainSlider" min="0" max="100" step="5" value="0" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Glow</label><span class="val" id="glowVal">0%</span></div><input type="range" id="glowSlider" min="0" max="100" step="5" value="0" /></div></div><div class="section" id="animSection" style="display:none;"><div class="section-title purple">Animation</div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Max Frames</label><span class="val" id="maxFramesVal">24</span></div><input type="range" id="maxFramesSlider" min="4" max="60" step="2" value="24" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Sample FPS</label><span class="val" id="sampleFpsVal">12</span></div><input type="range" id="sampleFpsSlider" min="4" max="30" step="2" value="12" /></div></div><div class="section"><div class="section-title green">GIF Export</div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Cell Size</label><span class="val" id="gifCellVal">6 px</span></div><input type="range" id="gifCellSlider" min="4" max="14" step="1" value="6" /></div><div class="ctrl-slider ctrl" id="blendRow"><div class="ctrl-head"><label>Dissolve Steps</label><span class="val" id="blendStepsVal">20</span></div><input type="range" id="blendStepsSlider" min="4" max="40" step="2" value="20" /></div><div class="ctrl-slider ctrl" id="holdRow"><div class="ctrl-head"><label>Hold Frames</label><span class="val" id="holdFramesVal">5</span></div><input type="range" id="holdFramesSlider" min="0" max="30" step="1" value="5" /></div><div class="toggle-wrap" id="smoothMergeRow" style="display:none;"><label>Smooth Merge</label><div class="toggle" id="smoothMergeToggle" data-key="smoothMerge"></div></div></div><div class="section"><div class="section-title mask">⚡ Mask Reveal</div><div class="ctrl-slider ctrl" style="margin-bottom:8px;"><div class="ctrl-head"><label style="color:var(--text); font-weight:600;">Reveal</label><span class="val" id="maskProgressVal" style="color:var(--mask);">0%</span></div><input type="range" id="maskProgressSlider" min="0" max="100" step="1" value="0" style="accent-color:var(--mask);" /></div><div class="btn-row" style="margin-bottom:8px;"><button class="btn btn-secondary" id="btnMaskReset">↩ Reset</button><button class="btn" id="btnMaskPlay" style="background:var(--mask);color:#fff;">▶ Play</button></div><div class="toggle-wrap"><label>Reverse (hide → reveal flips)</label><div class="toggle" id="reverseToggle"></div></div><div class="btn-row" style="margin-bottom:10px;"><button class="btn btn-export" id="btnExportRevealGif" style="background:var(--mask);">▶ Export Reveal GIF</button></div><div style="font-size:9px;color:var(--label);letter-spacing:0.1em;margin-top:4px;">PRESETS</div><div class="preset-row" id="presetRow"><button class="preset-chip" data-preset="wipe">Wipe</button><button class="preset-chip" data-preset="matrix">Matrix</button><button class="preset-chip" data-preset="glitch">Glitch</button><button class="preset-chip" data-preset="bloom">Bloom</button><button class="preset-chip" data-preset="wave">Wave</button><button class="preset-chip" data-preset="shatter">Shatter</button><button class="preset-chip" data-preset="halftone-print" style="border-color:#7c5cfc;color:#7c5cfc;">Halftone Print</button></div><div class="ctrl" style="margin-bottom:0;"><label>Direction</label></div><div class="dir-grid" id="dirGrid"><button class="dir-btn active" data-dir="lr" title="Left → Right">→</button><button class="dir-btn" data-dir="rl" title="Right → Left">←</button><button class="dir-btn" data-dir="tb" title="Top → Bottom">↓</button><button class="dir-btn" data-dir="bt" title="Bottom → Top">↑</button><button class="dir-btn" data-dir="tl-br" title="↖ → ↘">↘</button><button class="dir-btn" data-dir="tr-bl" title="↗ → ↙">↙</button><button class="dir-btn" data-dir="bl-tr" title="↙ → ↗">↗</button><button class="dir-btn" data-dir="br-tl" title="↘ → ↖">↖</button><button class="dir-btn" data-dir="radial-out" title="Out from center">⊙</button><button class="dir-btn" data-dir="radial-in" title="In to center">⊚</button><button class="dir-btn" data-dir="random" title="Random scatter">✦</button><button class="dir-btn" data-dir="diag-stripes" title="Diagonal stripes">≡</button><button class="dir-btn" data-dir="paint" title="Paint custom reveal — drag on canvas">✎</button><button class="dir-btn" data-dir="multi-front" title="Two fronts colliding">⫸</button></div><div id="paintHelp" style="display:none; font-size:10px; color:var(--label); padding:6px 0; line-height:1.4;">
+</style></head><body><aside id="sidebar"><div id="sidebar-header"><div class="logo-row"><div class="logo-mark">⠿</div><div class="title-stack"><h1>ASCII Studio</h1><p>Preview &amp; export</p></div></div><span class="version-pill">v1.0</span></div><div id="sidebar-scroll"><div class="section"><div id="dropZone"><img id="thumbImg" alt="" /><div class="drop-label"><span>Click or drop</span> image, GIF or video</div><div class="file-name" id="dropFileName"></div></div><input type="file" id="fileInput" accept="image/*,video/*,.gif" /></div><div class="section" style="display:flex; gap:6px; padding-top:8px;"><button class="btn btn-secondary" id="btnWebcam" style="font-size:10px; padding:6px 4px;">📷 Webcam</button><button class="btn btn-secondary" id="btnCompare" style="font-size:10px; padding:6px 4px;">↔ Compare</button><button class="btn btn-secondary" id="btnShare" style="font-size:10px; padding:6px 4px;">🔗 Share</button></div><div class="section"><div class="section-title">Character Set</div><div class="ctrl"><label>Render Mode</label><select id="renderModeSelect"><option value="ascii">ASCII Chars</option><option value="halftone">Halftone Dots</option><option value="block">Block Pixels</option><option value="geometric">Geometric</option><option value="braille">Braille (8× density)</option><option value="bayer">Bayer Dither</option></select></div><div class="ctrl" id="rampRow"><label>Ramp</label><input type="text" id="ramp" value="@X&amp;$#x*+=-. " maxlength="32" style="max-width:130px;" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Width</label><span class="val" id="widthVal">130</span></div><input type="range" id="widthSlider" min="20" max="220" step="5" value="130" /></div></div><div class="section"><div class="section-title">Image Adjustments</div><div class="toggle-wrap"><label>Color</label><div class="toggle on" id="colorToggle" data-key="color"></div></div><div class="toggle-wrap"><label>Invert</label><div class="toggle on" id="invertToggle" data-key="invert"></div></div><div class="toggle-wrap"><label>Auto Contrast</label><div class="toggle on" id="autoContrastToggle" data-key="autoContrast"></div></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Cell Aspect</label><span class="val" id="cellAspectVal">1.00</span></div><input type="range" id="cellAspectSlider" min="0.3" max="2.0" step="0.05" value="1.0" /></div><div class="toggle-wrap"><label>Edge Detection</label><div class="toggle" id="edgeToggle" data-key="edgeOn"></div></div><div class="ctrl-slider ctrl" id="edgeRow" style="display:none;"><div class="ctrl-head"><label>Edge Threshold</label><span class="val" id="edgeVal">40</span></div><input type="range" id="edgeSlider" min="1" max="120" step="1" value="40" /></div></div><div class="section"><div class="section-title">🎨 Color Theme</div><div class="preset-row" id="themeRow"><button class="preset-chip active" data-theme="auto">Auto</button><button class="preset-chip" data-theme="matrix">Matrix</button><button class="preset-chip" data-theme="amber">Amber</button><button class="preset-chip" data-theme="cyber">Cyber</button><button class="preset-chip" data-theme="mono">Mono</button><button class="preset-chip" data-theme="sepia">Sepia</button><button class="preset-chip" data-theme="custom">Custom</button></div><div id="customThemeBox" style="display:none;"><div class="ctrl"><label>Foreground</label><input type="color" id="themeFg" value="#e6e6e6" /></div><div class="ctrl"><label>Background</label><input type="color" id="themeBg" value="#0a0a0c" /></div></div></div><div class="section"><div class="section-title">🪟 Overlay</div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Scanlines</label><span class="val" id="scanlinesVal">0%</span></div><input type="range" id="scanlinesSlider" min="0" max="100" step="5" value="0" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Vignette</label><span class="val" id="vignetteVal">0%</span></div><input type="range" id="vignetteSlider" min="0" max="100" step="5" value="0" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Grain</label><span class="val" id="grainVal">0%</span></div><input type="range" id="grainSlider" min="0" max="100" step="5" value="0" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Glow</label><span class="val" id="glowVal">0%</span></div><input type="range" id="glowSlider" min="0" max="100" step="5" value="0" /></div></div><div class="section" id="animSection" style="display:none;"><div class="section-title purple">Animation</div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Max Frames</label><span class="val" id="maxFramesVal">24</span></div><input type="range" id="maxFramesSlider" min="4" max="60" step="2" value="24" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Sample FPS</label><span class="val" id="sampleFpsVal">12</span></div><input type="range" id="sampleFpsSlider" min="4" max="30" step="2" value="12" /></div></div><div class="section"><div class="section-title green">GIF Export</div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Cell Size</label><span class="val" id="gifCellVal">6 px</span></div><input type="range" id="gifCellSlider" min="4" max="14" step="1" value="6" /></div><div class="ctrl-slider ctrl" id="blendRow"><div class="ctrl-head"><label>Dissolve Steps</label><span class="val" id="blendStepsVal">20</span></div><input type="range" id="blendStepsSlider" min="4" max="40" step="2" value="20" /></div><div class="ctrl-slider ctrl" id="holdRow"><div class="ctrl-head"><label>Hold Frames</label><span class="val" id="holdFramesVal">5</span></div><input type="range" id="holdFramesSlider" min="0" max="30" step="1" value="5" /></div><div class="toggle-wrap" id="smoothMergeRow" style="display:none;"><label>Smooth Merge</label><div class="toggle" id="smoothMergeToggle" data-key="smoothMerge"></div></div></div><div class="section"><div class="section-title mask">⚡ Mask Reveal</div><div class="ctrl-slider ctrl" style="margin-bottom:8px;"><div class="ctrl-head"><label style="color:var(--text); font-weight:600;">Reveal</label><span class="val" id="maskProgressVal" style="color:var(--mask);">0%</span></div><input type="range" id="maskProgressSlider" min="0" max="100" step="1" value="0" style="accent-color:var(--mask);" /></div><div class="btn-row" style="margin-bottom:8px;"><button class="btn btn-secondary" id="btnMaskReset">↩ Reset</button><button class="btn" id="btnMaskPlay" style="background:var(--mask);color:#fff;">▶ Play</button></div><div class="toggle-wrap"><label>Reverse (hide → reveal flips)</label><div class="toggle" id="reverseToggle"></div></div><div class="btn-row" style="margin-bottom:10px;"><button class="btn btn-export" id="btnExportRevealGif" style="background:var(--mask);">▶ Export Reveal GIF</button></div><div style="font-size:9px;color:var(--label);letter-spacing:0.1em;margin-top:4px;">PRESETS</div><div class="preset-row" id="presetRow"><button class="preset-chip" data-preset="wipe">Wipe</button><button class="preset-chip" data-preset="matrix">Matrix</button><button class="preset-chip" data-preset="glitch">Glitch</button><button class="preset-chip" data-preset="bloom">Bloom</button><button class="preset-chip" data-preset="wave">Wave</button><button class="preset-chip" data-preset="shatter">Shatter</button><button class="preset-chip" data-preset="halftone-print" style="border-color:#7c5cfc;color:#7c5cfc;">Halftone Print</button></div><div class="ctrl" style="margin-bottom:0;"><label>Direction</label></div><div class="dir-grid" id="dirGrid"><button class="dir-btn active" data-dir="lr" title="Left → Right">→</button><button class="dir-btn" data-dir="rl" title="Right → Left">←</button><button class="dir-btn" data-dir="tb" title="Top → Bottom">↓</button><button class="dir-btn" data-dir="bt" title="Bottom → Top">↑</button><button class="dir-btn" data-dir="tl-br" title="↖ → ↘">↘</button><button class="dir-btn" data-dir="tr-bl" title="↗ → ↙">↙</button><button class="dir-btn" data-dir="bl-tr" title="↙ → ↗">↗</button><button class="dir-btn" data-dir="br-tl" title="↘ → ↖">↖</button><button class="dir-btn" data-dir="radial-out" title="Out from center">⊙</button><button class="dir-btn" data-dir="radial-in" title="In to center">⊚</button><button class="dir-btn" data-dir="random" title="Random scatter">✦</button><button class="dir-btn" data-dir="diag-stripes" title="Diagonal stripes">≡</button><button class="dir-btn" data-dir="paint" title="Paint custom reveal — drag on canvas">✎</button><button class="dir-btn" data-dir="multi-front" title="Two fronts colliding">⫸</button></div><div id="paintHelp" style="display:none; font-size:10px; color:var(--label); padding:6px 0; line-height:1.4;">
 Click &amp; drag on canvas to paint reveal order.
 <button id="btnClearPaint" style="float:right; padding:1px 6px; font-size:9px; border:1px solid var(--border); background:var(--panel); color:var(--label); border-radius:3px; cursor:pointer;">Clear</button></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Duration</label><span class="val" id="durationVal">2.0 s</span></div><input type="range" id="durationSlider" min="0.3" max="10" step="0.1" value="2.0" /></div><div class="ctrl"><label>Easing</label><select id="easingSelect"><option value="linear">Linear</option><option value="in">Ease In</option><option value="out">Ease Out</option><option value="in-out">Ease In/Out</option><option value="step">Stepped</option><option value="exp">Exponential</option></select></div></div><div class="section"><div class="section-title mask">⚙ Flip Effect</div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Flip Duration</label><span class="val" id="flipDurVal">0.6 s</span></div><input type="range" id="flipDurSlider" min="0.05" max="2.5" step="0.05" value="0.6" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Flip Rate</label><span class="val" id="flipRateVal">20 ch/s</span></div><input type="range" id="flipRateSlider" min="5" max="80" step="5" value="20" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Vertical Jitter</label><span class="val" id="vertJitterVal">2 rows</span></div><input type="range" id="vertJitterSlider" min="0" max="10" step="1" value="2" /></div><div class="ctrl"><label>Charset</label><input type="text" id="flipCharsetInput" value="01/\_*+.-=" maxlength="24" style="max-width:120px;" /></div></div><div class="section"><div class="section-title mask">〰 Distortion</div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Wave Amount</label><span class="val" id="waveAmtVal">0%</span></div><input type="range" id="waveAmtSlider" min="0" max="50" step="1" value="0" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Wave Frequency</label><span class="val" id="waveFreqVal">8</span></div><input type="range" id="waveFreqSlider" min="1" max="40" step="1" value="8" /></div><div class="ctrl-slider ctrl"><div class="ctrl-head"><label>Edge Noise</label><span class="val" id="edgeNoiseVal">0%</span></div><input type="range" id="edgeNoiseSlider" min="0" max="50" step="1" value="0" /></div></div><div class="section"><div class="section-title mask">🎨 Flip Color</div><div class="ctrl"><label>Mode</label><select id="colorModeSelect"><option value="fade-grey">Fade Grey</option><option value="glitch">Glitch RGB</option><option value="mono">Mono Accent</option><option value="opacity">Opacity Fade</option><option value="invert">Inverted</option></select></div><div class="ctrl" id="monoColorRow" style="display:none;"><label>Accent</label><input type="color" id="monoColorInput" value="#ff8050" /></div></div><div class="section"><div class="section-title">📦 Export</div><div class="btn-row"><button class="btn btn-secondary" id="btnPng" disabled>PNG</button><button class="btn btn-secondary" id="btnSvg" disabled>SVG</button><button class="btn btn-secondary" id="btnTxt" disabled>TXT</button></div><div class="btn-row" style="margin-top:6px;"><button class="btn btn-secondary" id="btnHtml" disabled>HTML</button><button class="btn btn-secondary" id="btnMd" disabled>MD</button><button class="btn btn-secondary" id="btnAnsi" disabled>ANSI</button></div><div class="btn-row" style="margin-top:6px;"><button class="btn btn-export" id="btnGif" disabled>Export GIF</button></div><div class="btn-row" style="margin-top:6px;"><button class="btn btn-secondary" id="btnReset">Reset All Settings</button></div></div></div><div id="statusBar">Drop a file to start</div><div style="padding:6px 14px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);line-height:1.6;flex-shrink:0;"><span class="kbd">Space</span> play/pause &nbsp;
 <span class="kbd">R</span> reset &nbsp;
