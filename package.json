@@ -1,13 +1,23 @@
 {
-  "name": "figma-ascii-plugin",
-  "version": "0.1.0",
+  "name": "ascii-studio",
+  "version": "1.0.0",
   "private": true,
-  "description": "Figma plugin that turns images, GIFs, and videos into ASCII art on the canvas.",
-  "scripts": {
-    "build": "node build.mjs",
-    "watch": "node build.mjs --watch",
-    "typecheck": "tsc --noEmit"
+  "description": "ASCII Studio — turn images, GIFs and videos into typographic art. Standalone web dashboard plus a Figma plugin.",
+  "author": "Yash Saindane",
+  "license": "UNLICENSED",
+  "homepage": "https://github.com/yashsaindane/ascii-studio",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yashsaindane/ascii-studio.git"
   },
+  "scripts": {
+    "dev":       "node build.mjs --watch",
+    "build":     "node build.mjs",
+    "build:dev": "node build.mjs --dev",
+    "typecheck": "tsc --noEmit",
+    "preview":   "echo 'Open dist/dashboard.html in your browser'"
+  },
+  "keywords": ["ascii", "ascii-art", "figma-plugin", "halftone", "dithering", "creative-coding"],
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.0",
     "esbuild": "^0.24.0",

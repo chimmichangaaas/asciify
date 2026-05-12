@@ -1,3 +1,43 @@
+# Dependencies
 node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# OS / editor
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local environment
+.env
+.env.local
+.env.*.local
+
+# Secrets (do not commit ever)
+*.key
+*.pem
+*.cert
+secrets.json
+credentials.json
+
+# Build cache
+.cache/
+.tmp/
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# Local-only test files
+test-fixtures/local/
+playground/

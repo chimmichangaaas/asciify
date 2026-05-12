@@ -1,0 +1,38 @@
+name: Build
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+      - name: Verify build outputs
+        run: |
+          test -f dist/dashboard.html
+          test -f dist/ui.html
+          test -f dist/code.js
+          echo "Build sizes:"
+          du -h dist/*.html dist/*.js
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ascii-studio-build
+          path: dist/
+          retention-days: 30

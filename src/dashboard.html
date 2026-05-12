@@ -5,22 +5,35 @@
   <title>ASCII Studio</title>
   <style>
     :root {
-      --bg:       #08080b;
-      --sidebar:  #0f0f14;
-      --panel:    #16161e;
-      --panel-2:  #1d1d28;
-      --border:   #242432;
-      --border-2: #2f2f40;
-      --accent:   #4f80ff;
-      --accent2:  #7c5cfc;
-      --mask:     #ff8050;
-      --text:     #dde1f0;
-      --muted:    #555566;
-      --label:    #9090b0;
-      --value:    #4f80ff;
-      --danger:   #ff4f6a;
-      --success:  #3ddc84;
-      --export:   #7c5cfc;
+      --bg:       #faf9f6;   /* warm off-white */
+      --sidebar:  #ffffff;   /* pure white sidebar */
+      --panel:    #f4f3ef;   /* soft cream panels */
+      --panel-2:  #ebeae6;
+      --border:   #e6e5e0;   /* subtle borders */
+      --border-2: #d6d5d0;
+      --accent:   #4f46e5;   /* indigo */
+      --accent2:  #7c3aed;   /* purple */
+      --mask:     #ea580c;   /* orange */
+      --text:     #1a1a1f;   /* near-black */
+      --muted:    #71717a;
+      --label:    #52525b;
+      --value:    #4f46e5;
+      --danger:   #dc2626;
+      --success:  #16a34a;
+      --export:   #7c3aed;
+      --canvas-bg:#0c0c10;   /* keep canvas dark for contrast */
+    }
+    /* Prevent text selection on UI chrome */
+    body, #sidebar, #canvasToolbar, .section, .ctrl, .preset-row, .dir-grid,
+    button, label, .btn, .preset-chip, .dir-btn, .kbd {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      user-select: none;
+    }
+    /* Only allow selecting inside text/value inputs */
+    input[type=text], input[type=number], textarea {
+      -webkit-user-select: text;
+      user-select: text;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -56,7 +69,7 @@
       font-size: 13px;
       font-weight: 700;
       letter-spacing: 0.12em;
-      color: #fff;
+      color: var(--text);
       text-transform: uppercase;
     }
     #sidebar-header p {
@@ -187,6 +200,162 @@
       border-radius: 3px;
       margin: 0 2px;
     }
+
+    /* Author card */
+    #authorCard {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      background: linear-gradient(180deg, transparent, rgba(79,70,229,0.04));
+    }
+    #authorCard .author-glyph {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font: 700 16px/1 'SF Mono','Menlo',monospace;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    #authorCard .author-text { flex: 1; min-width: 0; }
+    #authorCard .author-name {
+      font: 600 12px/1.2 inherit;
+      color: var(--text);
+      letter-spacing: 0.01em;
+    }
+    #authorCard .author-role {
+      font: 9px/1.4 inherit;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      margin-top: 1px;
+    }
+    #authorCard .author-socials {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    #authorCard .author-socials a {
+      width: 22px; height: 22px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--sidebar);
+      color: var(--label);
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none;
+      font: 600 11px/1 inherit;
+      transition: all 0.15s;
+    }
+    #authorCard .author-socials a:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+    #authorCard .author-socials a svg { display: block; }
+
+    /* Newsletter modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(20,20,30,0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.25s ease-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-card {
+      background: var(--sidebar);
+      border-radius: 16px;
+      padding: 28px 28px 22px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 30px 80px rgba(20,20,30,0.25), 0 4px 16px rgba(20,20,30,0.1);
+      position: relative;
+      text-align: center;
+      animation: slideUp 0.3s ease-out;
+    }
+    .modal-close {
+      position: absolute;
+      top: 12px; right: 14px;
+      background: none; border: none;
+      font: 22px/1 inherit;
+      color: var(--muted);
+      cursor: pointer;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      transition: background 0.15s, color 0.15s;
+    }
+    .modal-close:hover { background: var(--panel); color: var(--text); }
+    .modal-mark {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font: 700 28px/1 'SF Mono','Menlo',monospace;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+    }
+    .modal-body {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 18px;
+    }
+    #newsletterForm {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #newsletterEmail {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border-2);
+      border-radius: 8px;
+      font: 13px/1 inherit;
+      color: var(--text);
+      background: var(--bg);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #newsletterEmail:focus { border-color: var(--accent); }
+    .modal-cta {
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font: 600 13px/1 inherit;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.15s;
+    }
+    .modal-cta:hover { opacity: 0.92; }
+    .modal-cta:active { transform: scale(0.98); }
+    .modal-dismiss {
+      margin-top: 10px;
+      background: none;
+      border: none;
+      font: 11px/1 inherit;
+      color: var(--muted);
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 4px 8px;
+    }
+    .modal-dismiss:hover { color: var(--text); }
 
     /* ── Control row ── */
     .ctrl {
@@ -364,11 +533,12 @@
 
     #preview {
       display: block;
-      image-rendering: auto;          /* crisp text, not pixelated */
+      image-rendering: auto;
       border-radius: 8px;
-      box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+      box-shadow: 0 16px 48px rgba(20,20,30,0.15), 0 2px 8px rgba(20,20,30,0.08);
       position: relative;
       z-index: 1;
+      pointer-events: auto; /* canvas itself stays clickable for origin/paint */
     }
 
     /* Origin marker for radial directions (click-to-set) */
@@ -868,12 +1038,48 @@
   </div><!-- end sidebar-scroll -->
 
   <div id="statusBar">Drop a file to start</div>
-  <div style="padding:6px 14px 10px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);line-height:1.6;flex-shrink:0;">
+
+  <!-- Keyboard hints -->
+  <div style="padding:6px 14px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);line-height:1.6;flex-shrink:0;">
     <span class="kbd">Space</span> play/pause &nbsp;
     <span class="kbd">R</span> reset &nbsp;
     <span class="kbd">←</span> <span class="kbd">→</span> scrub
   </div>
+
+  <!-- Author / socials card -->
+  <div id="authorCard">
+    <div class="author-glyph">⠿</div>
+    <div class="author-text">
+      <div class="author-name">Yash Saindane</div>
+      <div class="author-role">Built ASCII Studio · 2026</div>
+    </div>
+    <div class="author-socials">
+      <a href="https://x.com/yashsaindane" target="_blank" rel="noopener" title="X / Twitter" aria-label="X">𝕏</a>
+      <a href="https://github.com/yashsaindane" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      </a>
+      <a href="https://linkedin.com/in/yashsaindane" target="_blank" rel="noopener" title="LinkedIn" aria-label="LinkedIn">in</a>
+    </div>
+  </div>
 </aside>
+
+<!-- ── Newsletter Modal ──────────────────────────────────────────────────── -->
+<div id="newsletterBackdrop" class="modal-backdrop" style="display:none;">
+  <div class="modal-card" role="dialog" aria-label="Newsletter signup">
+    <button class="modal-close" id="newsletterClose" aria-label="Close">×</button>
+    <div class="modal-mark">⠿</div>
+    <h2 class="modal-title">Don't miss the next drop.</h2>
+    <p class="modal-body">
+      Get new presets, render modes, and tutorials in your inbox.
+      No spam — one email a month, max.
+    </p>
+    <form id="newsletterForm">
+      <input type="email" id="newsletterEmail" placeholder="you@email.com" required autocomplete="email" />
+      <button type="submit" class="modal-cta">Subscribe</button>
+    </form>
+    <button type="button" class="modal-dismiss" id="newsletterDismiss">No thanks</button>
+  </div>
+</div>
 
 <!-- ── Canvas area ─────────────────────────────────────────────────────── -->
 <main id="canvasArea">

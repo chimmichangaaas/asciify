@@ -4,6 +4,62 @@ import { decodeGifFile }   from './decode-gif';
 import { decodeVideoFile } from './decode-video';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
+// ── Anti-copy deterrents (client-side only — cosmetic protection) ─────────────
+// NB: nothing client-side can truly protect bundled JS. These are deterrents
+// against casual copying. Real protection requires server-side rendering.
+
+(function antiCopy() {
+  // Disable right-click context menu
+  document.addEventListener('contextmenu', e => {
+    // Allow on text/email inputs so users can paste
+    const t = e.target as HTMLElement;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+    e.preventDefault();
+  });
+
+  // Block common dev-tools / source-view shortcuts
+  document.addEventListener('keydown', e => {
+    const k = e.key;
+    const ctrl = e.ctrlKey || e.metaKey;
+    // F12
+    if (k === 'F12') { e.preventDefault(); return; }
+    // Ctrl/Cmd + U (view source)
+    if (ctrl && (k === 'u' || k === 'U')) { e.preventDefault(); return; }
+    // Ctrl/Cmd + S (save page)
+    if (ctrl && (k === 's' || k === 'S')) { e.preventDefault(); return; }
+    // Ctrl/Cmd + Shift + I/J/C (inspector / console / element picker)
+    if (ctrl && e.shiftKey && (k === 'I' || k === 'J' || k === 'C' || k === 'i' || k === 'j' || k === 'c')) {
+      e.preventDefault();
+      return;
+    }
+  });
+
+  // Block native drag-image (prevents drag-saving previews)
+  document.addEventListener('dragstart', e => {
+    const t = e.target as HTMLElement;
+    if (t && t.tagName === 'IMG') e.preventDefault();
+  });
+
+  // Console warning — won't stop anyone but flags casual copiers
+  try {
+    const big = 'background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:24px;font-weight:700;padding:14px 22px;border-radius:8px';
+    const small = 'color:#71717a;font-size:12px;line-height:1.6';
+    console.log('%cASCII Studio', big);
+    console.log(
+      '%cThis is a closed-source tool by Yash Saindane.\n' +
+      'If you copy this code you will be reported under copyright law.\n\n' +
+      'Want to use it commercially or partner?\n→ https://x.com/yashsaindane',
+      small,
+    );
+    // Override console.log/etc. to deter automated scraping
+    if (typeof window !== 'undefined') {
+      Object.defineProperty(window, '__SOURCE__', {
+        get() { console.warn('Nice try.'); return null; },
+      });
+    }
+  } catch {}
+})();
+
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -1886,3 +1942,88 @@ window.addEventListener('drop', e => {
   e.preventDefault();
   const f = e.dataTransfer?.files?.[0]; if (f) loadFile(f);
 });
+
+// ── Newsletter modal ─────────────────────────────────────────────────────────
+
+(function newsletter() {
+  const STORAGE_KEY = 'ascii_studio_newsletter';
+  const DELAY_MS    = 35000; // first appearance after 35 s
+  const ENDPOINT    = ''; // optional: paste your endpoint here later
+
+  const backdrop = document.getElementById('newsletterBackdrop')!;
+  const closeBtn = document.getElementById('newsletterClose')!;
+  const dismissBtn = document.getElementById('newsletterDismiss')!;
+  const form     = document.getElementById('newsletterForm') as HTMLFormElement;
+  const emailInput = document.getElementById('newsletterEmail') as HTMLInputElement;
+
+  function getState(): { subscribed?: boolean; dismissedAt?: number } {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+  function setState(s: object) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {}
+  }
+
+  function show() { backdrop.style.display = 'flex'; setTimeout(() => emailInput?.focus(), 250); }
+  function hide() { backdrop.style.display = 'none'; }
+
+  function shouldShow(): boolean {
+    const s = getState();
+    if (s.subscribed) return false;
+    // If dismissed in last 7 days, skip
+    if (s.dismissedAt && (Date.now() - s.dismissedAt) < 7 * 24 * 3600 * 1000) return false;
+    return true;
+  }
+
+  if (shouldShow()) {
+    setTimeout(() => { if (shouldShow()) show(); }, DELAY_MS);
+  }
+
+  closeBtn.addEventListener('click', () => {
+    setState({ ...getState(), dismissedAt: Date.now() });
+    hide();
+  });
+  dismissBtn.addEventListener('click', () => {
+    setState({ ...getState(), dismissedAt: Date.now() });
+    hide();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = emailInput.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      emailInput.style.borderColor = '#dc2626';
+      return;
+    }
+    setState({ subscribed: true, email });
+    // Optional: POST to endpoint
+    if (ENDPOINT) {
+      try {
+        await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source: 'ascii-studio', ts: Date.now() }),
+        });
+      } catch {}
+    }
+    // Visual confirmation
+    form.innerHTML = `<div style="padding:14px;color:#16a34a;font-weight:600;">✓ You're subscribed — thanks!</div>`;
+    setTimeout(hide, 1800);
+  });
+
+  // Close on backdrop click (not on card)
+  backdrop.addEventListener('click', e => {
+    if (e.target === backdrop) {
+      setState({ ...getState(), dismissedAt: Date.now() });
+      hide();
+    }
+  });
+
+  // ESC closes the modal
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && backdrop.style.display === 'flex') {
+      setState({ ...getState(), dismissedAt: Date.now() });
+      hide();
+    }
+  });
+})();
