@@ -47,37 +47,50 @@
   <link rel="apple-touch-icon" href="docs/logo-256.png" />
   <style>
     :root {
-      /* Apple-inspired refined palette — soft, premium, art-tool grade */
-      --bg:           #f5f5f7;     /* Apple's light gray background */
-      --sidebar:      rgba(255,255,255,0.72);   /* translucent for frosted glass */
-      --sidebar-solid:#ffffff;
-      --panel:        #ffffff;
-      --panel-2:      #f5f5f7;
-      --panel-hover:  rgba(0,0,0,0.04);
-      --border:       rgba(60,60,67,0.12);
-      --border-2:     rgba(60,60,67,0.20);
-      --separator:    rgba(60,60,67,0.08);
-      --accent:       #007aff;     /* SF Symbol blue */
+      /* Dark navy art-tool palette inspired by Blender / Cinema 4D / Procreate */
+      --bg:           #0c0f17;     /* deep navy body */
+      --sidebar:      rgba(28,33,48,0.86);
+      --sidebar-solid:#1c2130;
+      --panel:        #1c2130;     /* lighter floating surfaces */
+      --panel-2:      #242a3d;     /* hover / nested */
+      --panel-hover:  rgba(255,255,255,0.04);
+      --border:       rgba(255,255,255,0.06);
+      --border-2:     rgba(255,255,255,0.10);
+      --separator:    rgba(255,255,255,0.05);
+      --accent:       #007aff;     /* iOS blue accent (kept for compat) */
       --accent-press: #0066d1;
-      --accent2:      #5856d6;     /* SF Symbol violet */
-      --mask:         #ff9500;     /* SF Symbol orange */
-      --text:         #1d1d1f;     /* Apple near-black */
-      --text-2:       #424245;     /* secondary text */
-      --muted:        #6e6e73;     /* tertiary */
-      --label:        #6e6e73;
-      --value:        #007aff;
-      --danger:       #ff3b30;
-      --success:      #34c759;
-      --export:       #5856d6;
+      --accent2:      #5856d6;
+      --mask:         #ff7a3d;     /* hero orange — primary CTA */
+      --mask-press:   #f06420;
+      --text:         #f0f1f5;     /* off-white */
+      --text-2:       #b4b7c1;
+      --muted:        #6f7589;
+      --label:        #8a8ea0;
+      --value:        #ff7a3d;     /* orange numeric callout */
+      --danger:       #ff6b6b;
+      --success:      #4ade80;
+      --export:       #ff7a3d;
       --canvas-bg:    #0c0c10;
-      /* Apple-standard shadow tokens */
-      --shadow-sm:    0 1px 2px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04);
-      --shadow-md:    0 4px 16px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
-      --shadow-lg:    0 20px 48px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.04);
-      --shadow-glow:  0 4px 14px rgba(0,122,255,0.20);
-      /* Smooth motion curves */
+      /* Shadow tokens — softer, less depth than before */
+      --shadow-sm:    0 1px 2px rgba(0,0,0,0.30);
+      --shadow-md:    0 6px 24px rgba(0,0,0,0.32);
+      --shadow-lg:    0 16px 48px rgba(0,0,0,0.40);
+      --shadow-glow:  0 4px 16px rgba(255,122,61,0.32);
       --ease:         cubic-bezier(0.4, 0, 0.2, 1);
       --ease-spring:  cubic-bezier(0.34, 1.56, 0.64, 1);
+      /* Layout dimensions */
+      --topbar-h:     56px;
+      --gap:          12px;
+    }
+    /* Page background — dark navy with subtle blueprint grid */
+    body {
+      background:
+        linear-gradient(rgba(255,255,255,0.020) 1px, transparent 1px) 0 0 / 32px 32px,
+        linear-gradient(90deg, rgba(255,255,255,0.020) 1px, transparent 1px) 0 0 / 32px 32px,
+        radial-gradient(circle at 50% 0%, rgba(255,122,61,0.06), transparent 50%),
+        radial-gradient(circle at 0% 100%, rgba(88,86,214,0.06), transparent 50%),
+        var(--bg) !important;
+      color: var(--text);
     }
     /* SF Pro stack — system pulls true SF on Mac, Segoe on Windows */
     html, body {
@@ -122,17 +135,161 @@
       overflow: hidden;
     }
 
-    body { display: flex; height: 100vh; }
+    body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    #mainRow { display: flex; flex: 1; min-height: 0; padding: var(--gap); gap: var(--gap); }
 
-    /* ── Sidebar — heavy frosted glass ── */
+    /* ── Top bar (title row) ── */
+    #topBar {
+      height: var(--topbar-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 var(--gap);
+      padding-top: var(--gap);
+      color: var(--text);
+    }
+    .profile-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px 6px 6px;
+      background: var(--panel);
+      border-radius: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+    .profile-avatar {
+      width: 30px; height: 30px;
+      border-radius: 10px;
+      background: var(--mask) url('docs/logo-256.png') center / cover no-repeat;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .profile-info { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+    .profile-name { font-size: 13px; font-weight: 590; letter-spacing: -0.01em; color: var(--text); }
+    .profile-role { font-size: 11px; color: var(--muted); letter-spacing: -0.01em; }
+
+    .topbar-title {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 0 6px;
+    }
+    .tt-name { font-size: 14px; font-weight: 510; color: var(--text); letter-spacing: -0.01em; }
+    .tt-sub  { font-size: 11px; color: var(--muted); letter-spacing: -0.01em; }
+
+    .topbar-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .topbar-dots {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 12px;
+      background: var(--panel);
+      border-radius: 100px;
+      box-shadow: var(--shadow-sm);
+    }
+    .topbar-dots span {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+    .topbar-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--panel);
+      border: none;
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 510;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: background 0.15s var(--ease), transform 0.1s var(--ease);
+      box-shadow: var(--shadow-sm);
+    }
+    .topbar-pill:hover { background: var(--panel-2); }
+    .topbar-pill:active { transform: scale(0.96); }
+    .topbar-pill.icon { padding: 8px 11px; }
+    .topbar-play {
+      width: 38px; height: 38px;
+      border: none;
+      border-radius: 11px;
+      background: var(--mask);
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: var(--shadow-glow);
+      transition: transform 0.1s var(--ease), background 0.15s var(--ease);
+    }
+    .topbar-play:hover { background: var(--mask-press); }
+    .topbar-play:active { transform: scale(0.94); }
+
+    /* ── Floating bottom dock ── */
+    #bottomDock {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      display: flex;
+      gap: 6px;
+      padding: 8px;
+      background: var(--panel);
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+    }
+    .dock-btn {
+      width: 40px; height: 40px;
+      border: none;
+      border-radius: 11px;
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s var(--ease), transform 0.1s var(--ease);
+    }
+    .dock-btn:hover { background: rgba(255,255,255,0.08); }
+    .dock-btn:active { transform: scale(0.92); }
+    .dock-btn.dock-add {
+      background: var(--accent);
+      color: #fff;
+      font-size: 22px;
+      font-weight: 300;
+      line-height: 1;
+    }
+    .dock-btn.dock-add:hover { background: var(--accent-press); }
+    .dock-cta {
+      padding: 0 20px;
+      height: 40px;
+      border: none;
+      border-radius: 11px;
+      background: var(--mask);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 590;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(255,122,61,0.30);
+      transition: background 0.15s var(--ease), transform 0.1s var(--ease);
+    }
+    .dock-cta:hover { background: var(--mask-press); }
+    .dock-cta:active { transform: scale(0.96); }
+
+    /* ── Sidebar — floating dark panel ── */
     #sidebar {
-      width: 296px;
-      min-width: 296px;
-      background: rgba(255,255,255,0.62);
-      backdrop-filter: saturate(180%) blur(30px);
-      -webkit-backdrop-filter: saturate(180%) blur(30px);
-      border-right: 0.5px solid rgba(255,255,255,0.4);
-      box-shadow: 1px 0 0 rgba(60,60,67,0.06);
+      width: 264px;
+      min-width: 264px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow-md);
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -140,19 +297,18 @@
       z-index: 3;
     }
 
-    /* ── Right inspector panel — glass tool palette ── */
+    /* ── Right inspector — floating dark panel ── */
     #rightPanel {
       width: 256px;
       min-width: 256px;
-      background: rgba(255,255,255,0.62);
-      backdrop-filter: saturate(180%) blur(30px);
-      -webkit-backdrop-filter: saturate(180%) blur(30px);
-      border-left: 0.5px solid rgba(255,255,255,0.4);
-      box-shadow: -1px 0 0 rgba(60,60,67,0.06);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow-md);
       display: flex;
       flex-direction: column;
       overflow-y: auto;
-      padding: 18px 14px 24px;
+      padding: 16px 14px 96px; /* extra bottom padding so dock doesn't overlap */
       gap: 18px;
       flex-shrink: 0;
       z-index: 3;
@@ -413,14 +569,14 @@
     #dropZone .file-name { font-size: 11px; color: var(--muted); margin-top: 6px; display: none; }
     #fileInput { display: none; }
 
-    /* ── Section — refined Apple-style headings ── */
-    .section { padding: 14px 18px 4px; }
+    /* ── Section — refined dark-art-tool headings ── */
+    .section { padding: 14px 14px 4px; }
 
     .section-title {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 590;
       letter-spacing: -0.01em;
-      color: var(--text);
+      color: var(--text-2);
       padding: 0 0 10px 0;
       margin: 0;
       display: flex;
@@ -956,16 +1112,19 @@
     #statusBar.ok    { color: var(--success); }
     #statusBar.err   { color: var(--danger); }
 
-    /* ── Canvas area — transparent so body gradient shows through (true glass) ── */
+    /* ── Canvas area — floating dark surface with orange frame ── */
     #canvasArea {
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: transparent;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
       overflow: hidden;
       position: relative;
+      box-shadow: var(--shadow-md);
     }
-    #canvasArea::before { content: none; }   /* drop the vignette; gradient handles depth now */
+    #canvasArea::before { content: none; }
 
     #canvasToolbar {
       padding: 10px 16px;
@@ -977,10 +1136,8 @@
     }
     #canvasToolbar {
       padding: 12px 20px;
-      background: rgba(255,255,255,0.55);
-      backdrop-filter: saturate(180%) blur(28px);
-      -webkit-backdrop-filter: saturate(180%) blur(28px);
-      border-bottom: 0.5px solid rgba(60,60,67,0.10);
+      background: transparent;
+      border-bottom: 1px solid var(--border);
       position: relative;
       z-index: 2;
       display: flex;
@@ -988,42 +1145,12 @@
       gap: 12px;
     }
 
-    /* ── Top-center floating mode switcher ── */
-    .top-mode-switcher {
-      position: absolute;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      display: flex;
-      gap: 2px;
-      padding: 3px;
-      background: rgba(255,255,255,0.7);
-      backdrop-filter: saturate(180%) blur(20px);
-      -webkit-backdrop-filter: saturate(180%) blur(20px);
-      border-radius: 10px;
-      box-shadow: var(--shadow-md);
-      border: 0.5px solid rgba(255,255,255,0.8);
-    }
-    .tms-btn {
-      padding: 7px 14px;
-      border: none;
-      border-radius: 7px;
-      background: transparent;
-      color: var(--text-2);
-      font-size: 12px;
-      font-weight: 510;
-      letter-spacing: -0.01em;
-      cursor: pointer;
-      transition: background 0.18s var(--ease), color 0.18s var(--ease), transform 0.1s var(--ease);
-    }
-    .tms-btn:hover:not(.active) { color: var(--text); }
-    .tms-btn:active { transform: scale(0.96); }
-    .tms-btn.active {
-      background: var(--accent);
-      color: #fff;
-      box-shadow: 0 1px 4px rgba(0,122,255,0.20);
-    }
+    /* ── Top-center floating mode switcher (now hidden — top bar replaces it) ── */
+    .top-mode-switcher { display: none; }
+    .tms-btn {} /* still rendered for state-sync compatibility — kept invisible */
+
+    /* Hide the old in-sidebar author card too (top bar's profile chip replaces it) */
+    #authorCard { display: none !important; }
     #canvasToolbar .info { flex: 1; font-size: 12px; color: var(--muted); font-weight: 400; letter-spacing: -0.01em; }
     .zoom-ctrl {
       display: flex;
@@ -1168,13 +1295,11 @@
     #emptyState .big { font-size: 48px; opacity: 0.3; }
     #emptyState p { font-size: 12px; }
 
-    /* ── Timeline — heavy glass bottom panel ── */
+    /* ── Timeline — dark bottom strip inside canvas card ── */
     .timeline {
       padding: 14px 20px 18px;
-      background: rgba(255,255,255,0.55);
-      backdrop-filter: saturate(180%) blur(28px);
-      -webkit-backdrop-filter: saturate(180%) blur(28px);
-      border-top: 0.5px solid rgba(60,60,67,0.10);
+      background: transparent;
+      border-top: 1px solid var(--border);
       display: none;
       flex-direction: column;
       gap: 12px;
@@ -1308,6 +1433,38 @@
   </style>
 </head>
 <body>
+
+<!-- ── Top bar — title row with profile chip + actions ─────────────────── -->
+<header id="topBar">
+  <div class="profile-chip">
+    <div class="profile-avatar"></div>
+    <div class="profile-info">
+      <div class="profile-name">Yash Saindane</div>
+      <div class="profile-role">Asciify · v1.0</div>
+    </div>
+  </div>
+
+  <div class="topbar-title">
+    <div class="tt-name" id="tbProjectName">Untitled</div>
+    <div class="tt-sub"  id="tbProjectSub">Drop an image to begin</div>
+  </div>
+
+  <div class="topbar-actions">
+    <div class="topbar-dots" title="Quick preview">
+      <span style="background:#ff7a3d"></span>
+      <span style="background:#4ade80"></span>
+      <span style="background:#5856d6"></span>
+      <span style="background:#007aff"></span>
+    </div>
+    <button class="topbar-pill" id="tbThemePill">Auto ▾</button>
+    <button class="topbar-pill icon" title="Render mode"><span>⬛</span></button>
+    <button class="topbar-pill icon" title="Recording">⏺</button>
+    <button class="topbar-play" id="tbPlay" title="Play / pause">▶</button>
+  </div>
+</header>
+
+<!-- Main row holds the 3 panels -->
+<div id="mainRow">
 
 <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
 <aside id="sidebar" data-tab="style">
@@ -2014,6 +2171,18 @@
     <div class="rp-kbd-row"><span>Fit zoom</span><kbd>F</kbd></div>
   </div>
 </aside>
+
+</div><!-- /#mainRow -->
+
+<!-- ── Floating bottom dock — circular tool icons ──────────────────────── -->
+<div id="bottomDock">
+  <button class="dock-btn dock-add"   id="dockAdd"    title="Add keyframe image">+</button>
+  <button class="dock-btn"            id="dockWebcam" title="Webcam">📷</button>
+  <button class="dock-btn"            id="dockMask"   title="Mask reveal">✦</button>
+  <button class="dock-btn"            id="dockCompare" title="Compare original">↔</button>
+  <button class="dock-btn"            id="dockHover"  title="Hover effects">⚡</button>
+  <button class="dock-cta" id="dockRender">+ Export</button>
+</div>
 
 <!-- SCRIPT -->
 </body>

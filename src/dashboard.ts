@@ -1143,8 +1143,9 @@ async function loadFile(file: File) {
     thumbImg.style.display = 'block';
     dropFileName.textContent = file.name;
     dropFileName.style.display = 'block';
-    // Mirror to right panel
+    // Mirror to right panel + top bar
     updateRightPanel(thumbDataUrl, file.name);
+    if (typeof updateTopBar === 'function') updateTopBar(file.name);
 
     const isAnim = rawFrames.length > 1;
     animSection.style.display    = isAnim ? 'block' : 'none';
@@ -1309,6 +1310,46 @@ rpQuickGif.addEventListener('click',   () => {
   else { btnPng.click(); }
 });
 rpQuickShare.addEventListener('click', () => btnShare.click());
+
+// Top bar wires
+const tbProjectName = document.getElementById('tbProjectName')!;
+const tbProjectSub  = document.getElementById('tbProjectSub')!;
+const tbPlay        = document.getElementById('tbPlay') as HTMLButtonElement;
+tbPlay.addEventListener('click', () => playBtn.click());
+
+// Sync top-bar title from filename + frame info
+function updateTopBar(fileName?: string) {
+  if (fileName) tbProjectName.textContent = fileName.replace(/\.[a-z]+$/i, '');
+  if (asciiFrames.length) {
+    const f = asciiFrames[0];
+    tbProjectSub.textContent = `${f.columns}×${f.rows} chars · ${rawFrames.length} frame${rawFrames.length > 1 ? 's' : ''}`;
+  } else {
+    tbProjectSub.textContent = 'Drop an image to begin';
+  }
+}
+
+// Bottom dock wires
+const dockAdd     = document.getElementById('dockAdd')     as HTMLButtonElement;
+const dockWebcam  = document.getElementById('dockWebcam')  as HTMLButtonElement;
+const dockMask    = document.getElementById('dockMask')    as HTMLButtonElement;
+const dockCompare = document.getElementById('dockCompare') as HTMLButtonElement;
+const dockHover   = document.getElementById('dockHover')   as HTMLButtonElement;
+const dockRender  = document.getElementById('dockRender')  as HTMLButtonElement;
+dockAdd.addEventListener('click',     () => addImageInput.click());
+dockWebcam.addEventListener('click',  () => btnWebcam.click());
+dockCompare.addEventListener('click', () => btnCompare.click());
+dockMask.addEventListener('click',    () => {
+  // Switch sidebar to Animate tab
+  (document.querySelector<HTMLButtonElement>('.tab-btn[data-tab="mask"]'))!.click();
+});
+dockHover.addEventListener('click',   () => {
+  // Switch sidebar to Style tab (which has hover controls)
+  (document.querySelector<HTMLButtonElement>('.tab-btn[data-tab="style"]'))!.click();
+});
+dockRender.addEventListener('click',  () => {
+  if (asciiFrames.length >= 2) btnGif.click();
+  else btnPng.click();
+});
 
 // ── ASCII conversion ──────────────────────────────────────────────────────────
 
