@@ -250,7 +250,7 @@ const S = {
   holdFrames:    5,
   smoothMerge:   false,
   // Render mode
-  renderMode:    'ascii' as 'ascii'|'halftone'|'block'|'geometric'|'braille'|'bayer',
+  renderMode:    'ascii' as 'ascii'|'halftone'|'block'|'geometric'|'braille'|'bayer'|'overlay',
   // Theme
   theme:         'auto' as 'auto'|'matrix'|'amber'|'cyber'|'mono'|'sepia'|'custom',
   themeFg:       '#e6e6e6',
@@ -267,8 +267,7 @@ const S = {
     | 'spotlight' | 'comet' | 'glitch' | 'particles' | 'tilt'
     | 'plasma' | 'lens' | 'lightning' | 'shockwave' | 'aurora'
     | 'mask-reveal' | 'mask-paint' | 'mask-trail' | 'mask-erase'
-    | 'photo-ascii-reveal' | 'photo-ascii-paint' | 'ascii-photo-reveal'
-    | 'photo-ascii-overlay',
+    | 'photo-ascii-reveal' | 'photo-ascii-paint' | 'ascii-photo-reveal',
   hoverRadius:   5,
   hoverStrength: 60,
   hoverSmooth:   22,      // cursor lag % (5 = very smooth/laggy, 100 = instant)
@@ -1168,12 +1167,19 @@ async function loadFile(file: File) {
 const HALFTONE_RAMP  = '⬤●⬭◍○∘·  ';   // size-graduated dots
 const BLOCK_RAMP     = '█▓▒░ ';
 const GEOMETRIC_RAMP = '●◉◎○◌⋅ ';
-const BAYER_4 = [
-  [ 0,  8,  2, 10],
-  [12,  4, 14,  6],
-  [ 3, 11,  1,  9],
-  [15,  7, 13,  5],
+// 8×8 ordered Bayer matrix — finer gradations than 4×4 = smoother dithered output
+const BAYER_8 = [
+  [ 0, 32,  8, 40,  2, 34, 10, 42],
+  [48, 16, 56, 24, 50, 18, 58, 26],
+  [12, 44,  4, 36, 14, 46,  6, 38],
+  [60, 28, 52, 20, 62, 30, 54, 22],
+  [ 3, 35, 11, 43,  1, 33,  9, 41],
+  [51, 19, 59, 27, 49, 17, 57, 25],
+  [15, 47,  7, 39, 13, 45,  5, 37],
+  [63, 31, 55, 23, 61, 29, 53, 21],
 ];
+// Multi-level palette for Bayer dithering — 5 density levels via block chars
+const BAYER_PALETTE = ' ░▒▓█';
 
 function resampleToImageData(img: ImageData, w: number, h: number): ImageData {
   const src = document.createElement('canvas');
@@ -1188,26 +1194,31 @@ function resampleToImageData(img: ImageData, w: number, h: number): ImageData {
   return dc.getImageData(0, 0, w, h);
 }
 
-function imageDataToBraille(img: ImageData, widthChars: number, invert: boolean, autoContrast: boolean): AsciiResult {
-  // Aspect: each braille char represents 2 pixel-cols × 4 pixel-rows.
-  // Visually a typical font cell is ~ 0.5 wide:tall, so a braille char displays ~2:4 dots
-  // in a 0.5:1 cell — meaning each "dot row" is ~0.25 cell tall, each "dot col" ~0.25 cell wide.
-  // For natural image aspect: heightChars ≈ imageAspect × widthChars (with cellAspect baked in).
+function imageDataToBraille(img: ImageData, widthChars: number, invert: boolean, autoContrast: boolean, cellAspect: number): AsciiResult {
+  // Each braille char fits 2 dot-cols × 4 dot-rows inside ONE monospace cell.
+  // A monospace cell visually has aspect ~0.5 width : 1 height (twice as tall as wide).
+  // So output aspect: imgAspect = heightChars / (widthChars * 0.5) = 2 × heightChars / widthChars
+  // ⇒ heightChars = imgAspect × widthChars × 0.5 (same formula as plain ASCII)
   const aspect = img.height / img.width;
-  const heightChars = Math.max(1, Math.round(aspect * widthChars));
+  const heightChars = Math.max(1, Math.round(aspect * widthChars * 0.5 * cellAspect));
   const sw = widthChars * 2;
   const sh = heightChars * 4;
   const sampled = resampleToImageData(img, sw, sh);
   const d = sampled.data;
 
-  // Find threshold via simple mean luminance for autoContrast
-  let lumSum = 0;
-  if (autoContrast) {
-    for (let i = 0; i < d.length; i += 4) {
-      lumSum += (d[i] * 0.2126 + d[i+1] * 0.7152 + d[i+2] * 0.0722) / 255;
-    }
+  // Histogram-based threshold (mid-point of the value range) for better contrast
+  // than a flat 0.5 split. Falls back to mean for autoContrast.
+  let lumMin = 1, lumMax = 0, lumSum = 0, n = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = (d[i] * 0.2126 + d[i+1] * 0.7152 + d[i+2] * 0.0722) / 255;
+    if (l < lumMin) lumMin = l;
+    if (l > lumMax) lumMax = l;
+    lumSum += l;
+    n++;
   }
-  const threshold = autoContrast ? lumSum / (d.length / 4) : 0.5;
+  const lumMean = lumSum / n;
+  // Bias the threshold slightly above the mean → preserves detail in mid-tones
+  const threshold = autoContrast ? (lumMin + lumMax) / 2 : lumMean;
 
   // Map (col, row) within the 2×4 sub-grid → braille bit
   const dotMap: Array<[number, number, number]> = [
@@ -1249,22 +1260,42 @@ function imageDataToBraille(img: ImageData, widthChars: number, invert: boolean,
   return { text, columns: widthChars, rows: heightChars, colors };
 }
 
-function imageDataToBayer(img: ImageData, widthChars: number, invert: boolean, cellAspect: number): AsciiResult {
+function imageDataToBayer(img: ImageData, widthChars: number, invert: boolean, autoContrast: boolean, cellAspect: number): AsciiResult {
   const aspect = img.height / img.width;
   const heightChars = Math.max(1, Math.round(aspect * widthChars * 0.5 * cellAspect));
   const sampled = resampleToImageData(img, widthChars, heightChars);
   const d = sampled.data;
 
+  // Optional auto-contrast: stretch luminance to fill 0..1 range
+  let lumMin = 1, lumMax = 0;
+  if (autoContrast) {
+    for (let i = 0; i < d.length; i += 4) {
+      const l = (d[i] * 0.2126 + d[i+1] * 0.7152 + d[i+2] * 0.0722) / 255;
+      if (l < lumMin) lumMin = l;
+      if (l > lumMax) lumMax = l;
+    }
+  } else {
+    lumMin = 0; lumMax = 1;
+  }
+  const lumRange = Math.max(0.01, lumMax - lumMin);
+
   let text = '';
   const colors = new Uint8Array(widthChars * heightChars * 3);
+  const numLevels = BAYER_PALETTE.length - 1;        // 4 (= 5 distinct chars)
 
   for (let y = 0; y < heightChars; y++) {
     for (let x = 0; x < widthChars; x++) {
       const idx = (y * widthChars + x) * 4;
       let lum = (d[idx] * 0.2126 + d[idx+1] * 0.7152 + d[idx+2] * 0.0722) / 255;
+      // Stretch contrast
+      lum = (lum - lumMin) / lumRange;
       if (invert) lum = 1 - lum;
-      const thresh = (BAYER_4[y % 4][x % 4] + 0.5) / 16;
-      text += lum > thresh ? '█' : ' ';
+      // Bayer offset for ordered dithering (centered around 0)
+      const bayerOffset = (BAYER_8[y % 8][x % 8] / 64 - 0.5) / numLevels;
+      const adjusted = Math.max(0, Math.min(1, lum + bayerOffset));
+      // Quantize to N density levels
+      const level = Math.min(numLevels, Math.floor(adjusted * (numLevels + 0.5)));
+      text += BAYER_PALETTE[level];
       const o = (y * widthChars + x) * 3;
       colors[o]   = d[idx];
       colors[o+1] = d[idx+1];
@@ -1290,9 +1321,9 @@ async function buildAscii() {
   setStatus('Converting…');
 
   if (S.renderMode === 'braille') {
-    asciiFrames = rawFrames.map(f => imageDataToBraille(f, S.widthChars, S.invert, S.autoContrast));
+    asciiFrames = rawFrames.map(f => imageDataToBraille(f, S.widthChars, S.invert, S.autoContrast, S.cellAspect));
   } else if (S.renderMode === 'bayer') {
-    asciiFrames = rawFrames.map(f => imageDataToBayer(f, S.widthChars, S.invert, S.cellAspect));
+    asciiFrames = rawFrames.map(f => imageDataToBayer(f, S.widthChars, S.invert, S.autoContrast, S.cellAspect));
   } else {
     const ramp = rampForMode();
     asciiFrames = rawFrames.map(f =>
@@ -1852,66 +1883,6 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       c.fill();
     }
     c.restore();
-    return;
-  }
-
-  // ─── 🪟 Double Exposure — photo + ASCII rendered together full-canvas ────
-  if (S.hoverMode === 'photo-ascii-overlay') {
-    const imgCanvas = getRawImgCanvas();
-    if (!imgCanvas) return;
-
-    // 1. Wipe + draw the photo at canvas size
-    c.fillStyle = pal.bg;
-    c.fillRect(0, 0, cw, ch);
-    c.drawImage(imgCanvas, 0, 0, cw, ch);
-
-    // 2. Subtle darken pass so ASCII reads clearly on bright photo regions
-    c.fillStyle = 'rgba(0,0,0,0.18)';
-    c.fillRect(0, 0, cw, ch);
-
-    // 3. Draw every ASCII glyph over the photo with strength-driven alpha.
-    //    Strength 10% → 0.45 base alpha (chars barely there)
-    //    Strength 100% → 0.95 base alpha (chars dominate)
-    //    Cells inside the cursor radius get an additive boost so the cursor
-    //    'focuses' the ASCII forward (no visible ring — just brighter chars).
-    c.font = `${CELL}px 'SF Mono','Menlo','Consolas',monospace`;
-    c.textBaseline = 'top';
-    const baseAlpha = 0.45 + strength * 0.5;
-
-    for (let row = 0; row < rows; row++) {
-      const line = lines[row];
-      for (let col = 0; col < line.length; col++) {
-        const glyph = line[col];
-        if (glyph === ' ') continue;
-        const cellX = col * CELL;
-        const cellY = row * CELL;
-
-        // Cursor focus boost — cells closer to cursor are more opaque
-        let alpha = baseAlpha;
-        if (hoverPxSm) {
-          const cellCx = cellX + CELL / 2;
-          const cellCy = cellY + CELL / 2;
-          const d = Math.hypot(cellCx - cursorX, cellCy - cursorY);
-          if (d < radiusPx) {
-            alpha = Math.min(1, baseAlpha + proxFromDist(d, radiusPx) * (1 - baseAlpha));
-          }
-        }
-
-        const o  = (row * frame.columns + col) * 3;
-        const fr = frame.colors ? frame.colors[o]     : 230;
-        const fg = frame.colors ? frame.colors[o + 1] : 230;
-        const fb = frame.colors ? frame.colors[o + 2] : 230;
-
-        c.save();
-        c.globalAlpha = alpha;
-        // Tiny dark shadow boosts readability over light photo regions
-        c.shadowColor = 'rgba(0,0,0,0.55)';
-        c.shadowBlur = 1.5;
-        c.fillStyle = pal.fgFn(fr, fg, fb);
-        c.fillText(glyph, cellX, cellY);
-        c.restore();
-      }
-    }
     return;
   }
 
@@ -2497,6 +2468,21 @@ function renderFrame(fi: number) {
   ctx.textRendering = 'geometricPrecision' as any;
   (ctx as any).imageSmoothingEnabled = true;
 
+  // Render-mode 'overlay' (Double Exposure): draw the raw photo as the bg,
+  // then layer ASCII over it with transparency
+  const isOverlay = S.renderMode === 'overlay';
+  if (isOverlay) {
+    const imgCanvas = getRawImgCanvas();
+    if (imgCanvas) {
+      ctx.drawImage(imgCanvas, 0, 0, cw, ch);
+      // Subtle darken pass for ASCII legibility
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(0, 0, cw, ch);
+    }
+  }
+
+  // ASCII pass (with transparency in overlay mode)
+  const overlayAlpha = 0.85;
   for (let row = 0; row < rows; row++) {
     const line = lines[row];
     for (let col = 0; col < line.length; col++) {
@@ -2508,7 +2494,16 @@ function renderFrame(fi: number) {
       } else {
         ctx.fillStyle = pal.fgFn(230, 230, 230);
       }
-      ctx.fillText(glyph, col * CELL, row * CELL);
+      if (isOverlay) {
+        ctx.save();
+        ctx.globalAlpha = overlayAlpha;
+        ctx.shadowColor = 'rgba(0,0,0,0.55)';
+        ctx.shadowBlur = 1.5;
+        ctx.fillText(glyph, col * CELL, row * CELL);
+        ctx.restore();
+      } else {
+        ctx.fillText(glyph, col * CELL, row * CELL);
+      }
     }
   }
 
