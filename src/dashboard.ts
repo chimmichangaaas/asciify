@@ -1979,20 +1979,21 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
         if (alpha <= 0.01) continue;
 
         if (photoFirst) {
-          // Photo is base, ASCII appears under cursor — fade in cell bg + glyph
+          // Photo + ASCII OVERLAY under cursor (double-exposure style)
+          // Photo stays visible everywhere — ASCII chars layer on top with
+          // proximity-based alpha. Small dark shadow keeps glyphs legible on
+          // bright photo regions. No cell darken — photo bleeds through.
           const o  = (row * frame.columns + col) * 3;
           const fr = frame.colors ? frame.colors[o]     : 230;
           const fg = frame.colors ? frame.colors[o + 1] : 230;
           const fb = frame.colors ? frame.colors[o + 2] : 230;
-          // Darken the patch first (so photo doesn't bleed through brightly)
-          c.fillStyle = pal.bg;
+          c.save();
           c.globalAlpha = alpha;
-          c.fillRect(cellX - 1, cellY - 1, CELL + 2, CELL + 2);
-          // Draw the themed glyph on top
-          c.globalAlpha = alpha;
+          c.shadowColor = 'rgba(0,0,0,0.55)';
+          c.shadowBlur = 1.5;
           c.fillStyle = pal.fgFn(fr, fg, fb);
           c.fillText(glyph, cellX, cellY);
-          c.globalAlpha = 1;
+          c.restore();
         } else {
           // ASCII is base, photo shows through under cursor — sample image
           // Compute source pixel from image to overlay this cell area
