@@ -1138,10 +1138,13 @@ async function loadFile(file: File) {
     const tmp = document.createElement('canvas');
     tmp.width = rawFrames[0].width; tmp.height = rawFrames[0].height;
     tmp.getContext('2d')!.putImageData(rawFrames[0], 0, 0);
-    thumbImg.src = tmp.toDataURL();
+    const thumbDataUrl = tmp.toDataURL();
+    thumbImg.src = thumbDataUrl;
     thumbImg.style.display = 'block';
     dropFileName.textContent = file.name;
     dropFileName.style.display = 'block';
+    // Mirror to right panel
+    updateRightPanel(thumbDataUrl, file.name);
 
     const isAnim = rawFrames.length > 1;
     animSection.style.display    = isAnim ? 'block' : 'none';
@@ -1246,6 +1249,66 @@ addImageInput.addEventListener('change', async () => {
   for (const f of Array.from(files)) await appendImageAsKeyframe(f);
   addImageInput.value = ''; // reset so same file can be added again
 });
+
+// ── Right inspector panel sync ───────────────────────────────────────────────
+
+const rpSourceThumb = document.getElementById('rpSourceThumb') as HTMLImageElement;
+const rpSourceName  = document.getElementById('rpSourceName')!;
+const rpSourceDim   = document.getElementById('rpSourceDim')!;
+const rpRenderMode  = document.getElementById('rpRenderMode')!;
+const rpTheme       = document.getElementById('rpTheme')!;
+const rpGrid        = document.getElementById('rpGrid')!;
+const rpFrames      = document.getElementById('rpFrames')!;
+const rpQuickPng    = document.getElementById('rpQuickPng')   as HTMLButtonElement;
+const rpQuickSvg    = document.getElementById('rpQuickSvg')   as HTMLButtonElement;
+const rpQuickCopy   = document.getElementById('rpQuickCopy')  as HTMLButtonElement;
+const rpQuickGif    = document.getElementById('rpQuickGif')   as HTMLButtonElement;
+const rpQuickShare  = document.getElementById('rpQuickShare') as HTMLButtonElement;
+
+const RENDER_LABELS: Record<string, string> = {
+  ascii: 'ASCII', halftone: 'Halftone', block: 'Block', geometric: 'Geometric',
+  braille: 'Braille', bayer: 'Bayer', overlay: 'Overlay',
+};
+const THEME_LABELS: Record<string, string> = {
+  auto: 'Auto', matrix: 'Matrix', amber: 'Amber', cyber: 'Cyberpunk',
+  mono: 'Mono', sepia: 'Sepia', custom: 'Custom',
+};
+
+function updateRightPanel(thumbDataUrl?: string, fileName?: string) {
+  if (thumbDataUrl) rpSourceThumb.src = thumbDataUrl;
+  if (fileName)     rpSourceName.textContent = fileName;
+  // Dims
+  if (rawFrames.length) {
+    const r0 = rawFrames[0];
+    rpSourceDim.textContent = `${r0.width} × ${r0.height} px`;
+  }
+  // Render mode + theme
+  rpRenderMode.textContent = RENDER_LABELS[S.renderMode] || S.renderMode;
+  rpTheme.textContent      = THEME_LABELS[S.theme] || S.theme;
+  // Output grid
+  if (asciiFrames.length) {
+    const f = asciiFrames[0];
+    rpGrid.textContent = `${f.columns} × ${f.rows}`;
+  } else {
+    rpGrid.textContent = '—';
+  }
+  rpFrames.textContent = String(rawFrames.length);
+}
+
+// Reflect render-mode + theme + frame changes in the right panel
+[renderModeSelect].forEach(el => el.addEventListener('change', () => updateRightPanel()));
+// Theme buttons live in #themeRow — observe via mutation when they toggle
+themeRow.addEventListener('click', () => setTimeout(() => updateRightPanel(), 50));
+
+// Wire the right-panel quick action buttons to existing export handlers
+rpQuickPng.addEventListener('click',   () => btnPng.click());
+rpQuickSvg.addEventListener('click',   () => btnSvg.click());
+rpQuickCopy.addEventListener('click',  () => btnCopy.click());
+rpQuickGif.addEventListener('click',   () => {
+  if (asciiFrames.length >= 2) btnGif.click();
+  else { btnPng.click(); }
+});
+rpQuickShare.addEventListener('click', () => btnShare.click());
 
 // ── ASCII conversion ──────────────────────────────────────────────────────────
 
@@ -1445,6 +1508,7 @@ async function buildAscii() {
     `${f0.columns}×${f0.rows} chars · ` +
     `${rawFrames[0].width}×${rawFrames[0].height} px`;
   setStatus(`✓ Ready — ${rawFrames.length} frame${rawFrames.length > 1 ? 's' : ''}`, 'ok');
+  if (typeof updateRightPanel === 'function') updateRightPanel();
 }
 
 function onSettingsChange() { buildAscii(); }
