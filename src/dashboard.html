@@ -861,6 +861,43 @@
       align-items: center;
       gap: 12px;
     }
+
+    /* ── Top-center floating mode switcher ── */
+    .top-mode-switcher {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-radius: 10px;
+      box-shadow: var(--shadow-md);
+      border: 0.5px solid rgba(255,255,255,0.8);
+    }
+    .tms-btn {
+      padding: 7px 14px;
+      border: none;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--text-2);
+      font-size: 12px;
+      font-weight: 510;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: background 0.18s var(--ease), color 0.18s var(--ease), transform 0.1s var(--ease);
+    }
+    .tms-btn:hover:not(.active) { color: var(--text); }
+    .tms-btn:active { transform: scale(0.96); }
+    .tms-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 1px 4px rgba(0,122,255,0.20);
+    }
     #canvasToolbar .info { flex: 1; font-size: 12px; color: var(--muted); font-weight: 400; letter-spacing: -0.01em; }
     .zoom-ctrl {
       display: flex;
@@ -1005,29 +1042,143 @@
     #emptyState .big { font-size: 48px; opacity: 0.3; }
     #emptyState p { font-size: 12px; }
 
-    /* Frame scrubber */
-    #scrubber {
-      padding: 8px 16px;
-      border-top: 1px solid var(--border);
+    /* ── Timeline — Apple-style with keyframe thumbnails ── */
+    .timeline {
+      padding: 12px 18px 14px;
+      background: rgba(245,245,247,0.72);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-top: 0.5px solid var(--separator);
       display: none;
-      align-items: center;
+      flex-direction: column;
       gap: 10px;
       flex-shrink: 0;
     }
-    #scrubber input[type=range] { flex: 1; }
-    #frameLabel { font-size: 10px; color: var(--label); min-width: 50px; text-align: right; }
-    #playBtn {
-      width: 26px; height: 26px;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      background: var(--panel);
-      color: var(--text);
-      font-size: 11px;
+    .timeline.show { display: flex; }
+    .timeline-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .tl-play {
+      width: 30px; height: 30px;
+      border: none;
+      border-radius: 100px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 12px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,122,255,0.30);
+      transition: background 0.15s var(--ease), transform 0.1s var(--ease);
     }
-    #playBtn:hover { border-color: var(--accent); }
+    .tl-play:hover { background: var(--accent-press); }
+    .tl-play:active { transform: scale(0.92); }
+    .tl-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-feature-settings: 'tnum';
+      letter-spacing: -0.01em;
+      flex: 1;
+    }
+    .tl-action {
+      padding: 7px 12px;
+      border: none;
+      border-radius: 8px;
+      background: rgba(120,120,128,0.12);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 510;
+      letter-spacing: -0.01em;
+      cursor: pointer;
+      transition: background 0.15s var(--ease);
+    }
+    .tl-action:hover { background: rgba(120,120,128,0.18); }
+    .tl-action:active { transform: scale(0.97); }
+
+    .timeline-track {
+      position: relative;
+      width: 100%;
+      height: 56px;
+      background: rgba(120,120,128,0.10);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .tl-thumbs {
+      position: absolute;
+      inset: 4px 4px 4px 4px;
+      display: flex;
+      gap: 2px;
+      align-items: stretch;
+      pointer-events: none;
+    }
+    .tl-thumb {
+      position: relative;
+      flex: 1;
+      border-radius: 6px;
+      background: #0c0c10 center / cover no-repeat;
+      box-shadow: 0 0 0 0.5px rgba(0,0,0,0.12);
+      pointer-events: auto;
+    }
+    .tl-thumb-remove {
+      position: absolute;
+      top: 3px; right: 3px;
+      width: 16px; height: 16px;
+      border: none;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 11px;
+      line-height: 1;
+      border-radius: 50%;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .tl-thumb:hover .tl-thumb-remove { opacity: 1; }
+    .tl-thumb-remove:hover { background: var(--danger); }
+    .tl-thumb-label {
+      position: absolute;
+      bottom: 3px; left: 4px;
+      font-size: 9px;
+      font-weight: 590;
+      color: #fff;
+      letter-spacing: -0.01em;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+      pointer-events: none;
+    }
+    .tl-scrubber {
+      position: absolute !important;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      opacity: 0;
+      cursor: ew-resize;
+      z-index: 5;
+    }
+    .tl-playhead {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.6), 0 2px 8px rgba(0,122,255,0.40);
+      left: 0;
+      pointer-events: none;
+      transition: left 0.05s linear;
+      z-index: 4;
+    }
+    .tl-playhead::before {
+      content: '';
+      position: absolute;
+      top: -3px; left: 50%;
+      transform: translateX(-50%);
+      width: 11px; height: 11px;
+      background: var(--accent);
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,122,255,0.40);
+    }
   </style>
 </head>
 <body>
@@ -1067,7 +1218,7 @@
     <!-- Tabbed sections — sections with data-tab show only when that tab is active -->
     <div class="tab-nav">
       <button class="tab-btn active" data-tab="style"><span class="tab-icon">🎨</span> Style</button>
-      <button class="tab-btn"        data-tab="mask"><span class="tab-icon">⚡</span> Reveal</button>
+      <button class="tab-btn"        data-tab="mask"><span class="tab-icon">⚡</span> Animate</button>
       <button class="tab-btn"        data-tab="export"><span class="tab-icon">📦</span> Export</button>
     </div>
 
@@ -1615,6 +1766,13 @@
 <!-- ── Canvas area ─────────────────────────────────────────────────────── -->
 <main id="canvasArea">
 
+  <!-- Top-center mode switcher — segmented control floating over the canvas -->
+  <div id="topModeSwitcher" class="top-mode-switcher">
+    <button class="tms-btn active" data-tab="style">🎨 Style</button>
+    <button class="tms-btn"        data-tab="mask">⚡ Animate</button>
+    <button class="tms-btn"        data-tab="export">📦 Export</button>
+  </div>
+
   <div id="canvasToolbar">
     <span class="info" id="infoLabel">—</span>
     <div class="zoom-ctrl">
@@ -1641,10 +1799,19 @@
     </div>
   </div>
 
-  <div id="scrubber">
-    <button id="playBtn">▶</button>
-    <input type="range" id="frameSlider" min="0" max="0" step="1" value="0" />
-    <span id="frameLabel">0 / 0</span>
+  <!-- Timeline with keyframes — appears whenever there's >1 frame -->
+  <div id="timeline" class="timeline">
+    <div class="timeline-controls">
+      <button id="playBtn" class="tl-play">▶</button>
+      <span id="frameLabel" class="tl-label">0 / 0</span>
+      <button id="tlAddKeyframe" class="tl-action" title="Add keyframe image">+ Add image</button>
+      <input type="file" id="addImageInput" accept="image/*" multiple style="display:none;" />
+    </div>
+    <div class="timeline-track" id="timelineTrack">
+      <div class="tl-thumbs" id="tlThumbs"></div>
+      <input type="range" id="frameSlider" class="tl-scrubber" min="0" max="0" step="0.01" value="0" />
+      <div class="tl-playhead" id="tlPlayhead"></div>
+    </div>
   </div>
 
   <!-- Author / socials card (floating bottom-right) -->

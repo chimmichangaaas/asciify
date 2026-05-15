@@ -64,25 +64,23 @@ import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-// ── Tab switching (Style / Reveal / Export) ──────────────────────────────────
+// ── Tab switching (Style / Animate / Export) — synced between sidebar tabs + top mode switcher ──
 (function tabSwitcher() {
-  const sidebar = document.getElementById('sidebar')!;
-  const btns = document.querySelectorAll<HTMLButtonElement>('.tab-btn');
-  const STORAGE = 'ascii_studio_tab';
-  // Restore previous tab
-  const saved = (() => { try { return localStorage.getItem(STORAGE); } catch { return null; } })();
-  if (saved && ['style', 'mask', 'export'].includes(saved)) {
-    sidebar.setAttribute('data-tab', saved);
-    btns.forEach(b => b.classList.toggle('active', b.dataset.tab === saved));
+  const sidebar  = document.getElementById('sidebar')!;
+  const sideBtns = document.querySelectorAll<HTMLButtonElement>('.tab-btn');
+  const topBtns  = document.querySelectorAll<HTMLButtonElement>('.tms-btn');
+  const STORAGE  = 'ascii_studio_tab';
+  function setTab(tab: string) {
+    sidebar.setAttribute('data-tab', tab);
+    sideBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    topBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+    try { localStorage.setItem(STORAGE, tab); } catch {}
   }
-  btns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const tab = btn.dataset.tab!;
-      btns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      sidebar.setAttribute('data-tab', tab);
-      try { localStorage.setItem(STORAGE, tab); } catch {}
-    });
+  const saved = (() => { try { return localStorage.getItem(STORAGE); } catch { return null; } })();
+  if (saved && ['style', 'mask', 'export'].includes(saved)) setTab(saved);
+  // Both sets of buttons drive the same setTab
+  [...sideBtns, ...topBtns].forEach(btn => {
+    btn.addEventListener('click', () => setTab(btn.dataset.tab!));
   });
 })();
 
@@ -124,10 +122,14 @@ const statusBar        = $('statusBar');
 const infoLabel        = $('infoLabel');
 const canvasEl         = $<HTMLCanvasElement>('preview');
 const emptyState       = $('emptyState');
-const scrubber         = $('scrubber');
+const scrubber         = $('timeline');                 // renamed in HTML: 'timeline'
 const frameSlider      = $<HTMLInputElement>('frameSlider');
 const frameLabel       = $('frameLabel');
 const playBtn          = $<HTMLButtonElement>('playBtn');
+const tlThumbs         = $('tlThumbs');
+const tlPlayhead       = $('tlPlayhead');
+const tlAddKeyframe    = $<HTMLButtonElement>('tlAddKeyframe');
+const addImageInput    = $<HTMLInputElement>('addImageInput');
 const zoomIn           = $<HTMLButtonElement>('zoomIn');
 const zoomOut          = $<HTMLButtonElement>('zoomOut');
 const zoomFit          = $<HTMLButtonElement>('zoomFit');
@@ -1143,21 +1145,107 @@ async function loadFile(file: File) {
 
     const isAnim = rawFrames.length > 1;
     animSection.style.display    = isAnim ? 'block' : 'none';
-    scrubber.style.display       = isAnim ? 'flex'  : 'none';
+    scrubber.classList.toggle('show', isAnim);
     smoothMergeRow.style.display = isAnim ? 'flex'  : 'none';
     frameSlider.max   = String(rawFrames.length - 1);
     frameSlider.value = '0';
     currentFrame      = 0;
 
     await buildAscii();
+    renderTimelineThumbs();
 
     if (isAnim) startAnim();
-    // Re-render mask at current progress if scrubber was already set
     if (M.progress > 0) renderAtProgress(M.progress);
   } catch (err) {
     setStatus((err as Error).message || 'Load failed', 'err');
   }
 }
+
+// ── Multi-image keyframes: add more images, render timeline thumbnails ──────
+
+async function appendImageAsKeyframe(file: File): Promise<void> {
+  try {
+    const newFrame = await decodeImageFile(file);
+    // For morphing across keyframes to blend cleanly, normalize ALL frames to the same dims
+    if (rawFrames.length === 0) {
+      rawFrames = [newFrame];
+      rawDelays = [100];
+    } else {
+      // Resample new frame to match the dimensions of the first frame
+      const first = rawFrames[0];
+      const tmp = document.createElement('canvas');
+      tmp.width = newFrame.width; tmp.height = newFrame.height;
+      tmp.getContext('2d')!.putImageData(newFrame, 0, 0);
+      const dst = document.createElement('canvas');
+      dst.width = first.width; dst.height = first.height;
+      const dc = dst.getContext('2d')!;
+      (dc as any).imageSmoothingQuality = 'high';
+      dc.drawImage(tmp, 0, 0, first.width, first.height);
+      rawFrames.push(dc.getImageData(0, 0, first.width, first.height));
+      rawDelays.push(100);
+    }
+    currentKind = rawFrames.length > 1 ? 'gif' : 'image';
+    await buildAscii();
+    const isAnim = rawFrames.length >= 2;
+    animSection.style.display    = isAnim ? 'block' : 'none';
+    scrubber.classList.toggle('show', isAnim);
+    smoothMergeRow.style.display = isAnim ? 'flex'  : 'none';
+    frameSlider.max   = String(Math.max(0, rawFrames.length - 1));
+    renderTimelineThumbs();
+    setStatus(`✓ Keyframe added — ${rawFrames.length} total`, 'ok');
+  } catch (err) {
+    setStatus((err as Error).message || 'Failed to add image', 'err');
+  }
+}
+
+function renderTimelineThumbs() {
+  if (!tlThumbs) return;
+  tlThumbs.innerHTML = '';
+  if (rawFrames.length < 2) return;
+  for (let i = 0; i < rawFrames.length; i++) {
+    const tmp = document.createElement('canvas');
+    tmp.width = rawFrames[i].width; tmp.height = rawFrames[i].height;
+    tmp.getContext('2d')!.putImageData(rawFrames[i], 0, 0);
+    const div = document.createElement('div');
+    div.className = 'tl-thumb';
+    div.style.backgroundImage = `url(${tmp.toDataURL()})`;
+    // Label
+    const lbl = document.createElement('div');
+    lbl.className = 'tl-thumb-label';
+    lbl.textContent = `${i + 1}`;
+    div.appendChild(lbl);
+    // Remove button (only show if more than 2 frames)
+    if (rawFrames.length > 2) {
+      const rm = document.createElement('button');
+      rm.className = 'tl-thumb-remove';
+      rm.textContent = '×';
+      rm.title = 'Remove keyframe';
+      rm.addEventListener('click', e => {
+        e.stopPropagation();
+        rawFrames.splice(i, 1);
+        rawDelays.splice(i, 1);
+        if (currentFrame >= rawFrames.length) currentFrame = Math.max(0, rawFrames.length - 1);
+        buildAscii().then(() => {
+          const isAnim = rawFrames.length >= 2;
+          scrubber.classList.toggle('show', isAnim);
+          frameSlider.max = String(Math.max(0, rawFrames.length - 1));
+          renderTimelineThumbs();
+        });
+      });
+      div.appendChild(rm);
+    }
+    tlThumbs.appendChild(div);
+  }
+}
+
+// "+ Add image" button — open file picker for additional keyframes
+tlAddKeyframe.addEventListener('click', () => addImageInput.click());
+addImageInput.addEventListener('change', async () => {
+  const files = addImageInput.files;
+  if (!files) return;
+  for (const f of Array.from(files)) await appendImageAsKeyframe(f);
+  addImageInput.value = ''; // reset so same file can be added again
+});
 
 // ── ASCII conversion ──────────────────────────────────────────────────────────
 
@@ -2516,39 +2604,174 @@ function renderFrame(fi: number) {
   syncCompare();
 }
 
-// ── Regular animation playback ────────────────────────────────────────────────
+// ── Animation playback with smooth keyframe morphing ─────────────────────────
+// `currentFrame` is allowed to be FRACTIONAL — between integer keyframes the
+// underlying ImageData of the two surrounding frames is blended, and the
+// resulting blended image is run through ASCII conversion on the fly so the
+// transition shows up as a smooth morph.
+
+let playStart = 0;          // wall-clock when play started
+let playFromFrame = 0;      // fractional frame index at play-start
 
 function startAnim() {
-  if (playing || asciiFrames.length < 2) return;
+  if (playing || rawFrames.length < 2) return;
   playing = true;
   playBtn.textContent = '⏸';
+  playStart = performance.now();
+  playFromFrame = currentFrame;
+  // Reset to start if already at the end
+  if (currentFrame >= rawFrames.length - 0.01) {
+    currentFrame = 0;
+    playFromFrame = 0;
+  }
   tick();
 }
 
 function stopAnim() {
   playing = false;
-  if (animTimer !== null) { clearTimeout(animTimer); animTimer = null; }
+  if (animTimer !== null) { cancelAnimationFrame(animTimer); animTimer = null; }
   playBtn.textContent = '▶';
 }
 
 function tick() {
-  if (!playing || !asciiFrames.length) return;
-  renderFrame(currentFrame);
-  const delay = (rawDelays[currentFrame] ?? 10) * 10;
-  currentFrame = (currentFrame + 1) % asciiFrames.length;
-  animTimer = setTimeout(tick, delay) as unknown as number;
+  if (!playing || !rawFrames.length) return;
+  // Total morph duration: ~1.2s per keyframe transition by default
+  const SECS_PER_FRAME = 1.2;
+  const elapsed = (performance.now() - playStart) / 1000;
+  let f = playFromFrame + elapsed / SECS_PER_FRAME;
+  if (f >= rawFrames.length) {
+    // Loop back to start
+    playStart = performance.now();
+    playFromFrame = 0;
+    f = 0;
+  }
+  currentFrame = f;
+  renderAtFrame(f);
+  animTimer = requestAnimationFrame(tick) as unknown as number;
+}
+
+// Blend two ImageData into one. Both must have same dimensions.
+function blendImageData(a: ImageData, b: ImageData, t: number): ImageData {
+  const out = new ImageData(a.width, a.height);
+  const ad = a.data, bd = b.data, od = out.data;
+  const inv = 1 - t;
+  for (let i = 0; i < ad.length; i++) od[i] = ad[i] * inv + bd[i] * t;
+  return out;
+}
+
+// Cache blended-frame ASCII so dragging the scrubber doesn't recompute uselessly
+let lastMorphIdx = -1;
+let lastMorphAscii: AsciiResult | null = null;
+
+function asciiForFractionalFrame(f: number): AsciiResult {
+  if (rawFrames.length < 2 || Number.isInteger(f)) {
+    return asciiFrames[Math.max(0, Math.min(asciiFrames.length - 1, Math.round(f)))];
+  }
+  // Round to ~30 fps morph buckets so caching kicks in
+  const bucket = Math.round(f * 30);
+  if (bucket === lastMorphIdx && lastMorphAscii) return lastMorphAscii;
+  const i0 = Math.floor(f);
+  const i1 = Math.min(rawFrames.length - 1, i0 + 1);
+  const t  = f - i0;
+  // Blend at the source ImageData level for true morph (not just ASCII char crossfade)
+  const blended = blendImageData(rawFrames[i0], rawFrames[i1], t);
+  // Run through the same ASCII pipeline used by buildAscii() — keeps render mode parity
+  let result: AsciiResult;
+  if (S.renderMode === 'braille') {
+    result = imageDataToBraille(blended, S.widthChars, S.invert, S.autoContrast, S.cellAspect);
+  } else if (S.renderMode === 'bayer') {
+    result = imageDataToBayer(blended, S.widthChars, S.invert, S.autoContrast, S.cellAspect);
+  } else {
+    const ramp = rampForMode();
+    result = imageDataToAscii(blended, {
+      widthChars: S.widthChars, ramp, invert: S.invert, autoContrast: S.autoContrast,
+      edgeThreshold: S.edgeOn ? S.edgeThreshold : null, cellAspect: S.cellAspect, color: S.color,
+    });
+  }
+  lastMorphIdx   = bucket;
+  lastMorphAscii = result;
+  return result;
+}
+
+// Update the timeline UI (playhead position + frame label + scrubber value)
+function updateTimelineUI(f: number) {
+  if (tlPlayhead) tlPlayhead.style.left = `${(f / Math.max(1, rawFrames.length - 1)) * 100}%`;
+  if (frameLabel)  frameLabel.textContent = `${(f + 1).toFixed(2)} / ${rawFrames.length}`;
+  frameSlider.value = String(f);
+}
+
+// Render whatever frame index — supports fractional for morph
+function renderAtFrame(f: number) {
+  if (!rawFrames.length) return;
+  const result = asciiForFractionalFrame(f);
+  // Temporarily slot the morphed result into the current display
+  const stash = asciiFrames[Math.floor(f)] ?? asciiFrames[0];
+  if (!stash) return;
+  // Render uses asciiFrames[currentFrame] — assign currentFrame to integer base
+  // and pass the morphed result via renderFrameInternal
+  renderFrameWith(result);
+  updateTimelineUI(f);
+}
+
+// Render a specific AsciiResult to the canvas (factored from renderFrame)
+function renderFrameWith(frame: AsciiResult) {
+  const lines = frame.text.split('\n');
+  const rows  = lines.length;
+  const cols  = lines.reduce((m, l) => Math.max(m, l.length), 0);
+  const cw    = cols * CELL;
+  const ch    = rows * CELL;
+  setCanvasSize(canvasEl, ctx, cw, ch);
+  const pal = getPalette();
+  ctx.fillStyle = pal.bg; ctx.fillRect(0, 0, cw, ch);
+  ctx.font = `${CELL}px 'SF Mono','Menlo','Consolas',monospace`;
+  ctx.textBaseline = 'top';
+  (ctx as any).textRendering = 'geometricPrecision';
+  (ctx as any).imageSmoothingEnabled = true;
+
+  const isOverlay = S.renderMode === 'overlay';
+  if (isOverlay) {
+    const imgCanvas = getRawImgCanvas();
+    if (imgCanvas) {
+      ctx.drawImage(imgCanvas, 0, 0, cw, ch);
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(0, 0, cw, ch);
+    }
+  }
+  for (let row = 0; row < rows; row++) {
+    const line = lines[row];
+    for (let col = 0; col < line.length; col++) {
+      const g = line[col];
+      if (g === ' ') continue;
+      if (frame.colors) {
+        const o = (row * frame.columns + col) * 3;
+        ctx.fillStyle = pal.fgFn(frame.colors[o], frame.colors[o + 1], frame.colors[o + 2]);
+      } else ctx.fillStyle = pal.fgFn(230, 230, 230);
+      if (isOverlay) {
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.shadowColor = 'rgba(0,0,0,0.55)';
+        ctx.shadowBlur = 1.5;
+        ctx.fillText(g, col * CELL, row * CELL);
+        ctx.restore();
+      } else ctx.fillText(g, col * CELL, row * CELL);
+    }
+  }
+  drawOverlay(ctx, cw, ch);
+  drawHoverEffect(ctx, frame, cw, ch);
+  applyZoom(zoomPct);
+  syncCompare();
 }
 
 playBtn.addEventListener('click', () => {
-  if (M.active) return; // mask owns the canvas
+  if (M.active) return;
   if (playing) stopAnim(); else startAnim();
 });
 
 frameSlider.addEventListener('input', () => {
   if (M.active) return;
   stopAnim();
-  currentFrame = parseInt(frameSlider.value);
-  renderFrame(currentFrame);
+  currentFrame = parseFloat(frameSlider.value);
+  renderAtFrame(currentFrame);
 });
 
 // ── Mask reveal — scrubber-driven, cell-based ────────────────────────────────
