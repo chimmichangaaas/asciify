@@ -267,7 +267,8 @@ const S = {
     | 'spotlight' | 'comet' | 'glitch' | 'particles' | 'tilt'
     | 'plasma' | 'lens' | 'lightning' | 'shockwave' | 'aurora'
     | 'mask-reveal' | 'mask-paint' | 'mask-trail' | 'mask-erase'
-    | 'photo-ascii-reveal' | 'photo-ascii-paint' | 'ascii-photo-reveal',
+    | 'photo-ascii-reveal' | 'photo-ascii-paint' | 'ascii-photo-reveal'
+    | 'photo-ascii-overlay',
   hoverRadius:   5,
   hoverStrength: 60,
   hoverSmooth:   22,      // cursor lag % (5 = very smooth/laggy, 100 = instant)
@@ -1851,6 +1852,66 @@ function drawHoverEffect(c: CanvasRenderingContext2D, frame: AsciiResult, cw: nu
       c.fill();
     }
     c.restore();
+    return;
+  }
+
+  // ─── 🪟 Double Exposure — photo + ASCII rendered together full-canvas ────
+  if (S.hoverMode === 'photo-ascii-overlay') {
+    const imgCanvas = getRawImgCanvas();
+    if (!imgCanvas) return;
+
+    // 1. Wipe + draw the photo at canvas size
+    c.fillStyle = pal.bg;
+    c.fillRect(0, 0, cw, ch);
+    c.drawImage(imgCanvas, 0, 0, cw, ch);
+
+    // 2. Subtle darken pass so ASCII reads clearly on bright photo regions
+    c.fillStyle = 'rgba(0,0,0,0.18)';
+    c.fillRect(0, 0, cw, ch);
+
+    // 3. Draw every ASCII glyph over the photo with strength-driven alpha.
+    //    Strength 10% → 0.45 base alpha (chars barely there)
+    //    Strength 100% → 0.95 base alpha (chars dominate)
+    //    Cells inside the cursor radius get an additive boost so the cursor
+    //    'focuses' the ASCII forward (no visible ring — just brighter chars).
+    c.font = `${CELL}px 'SF Mono','Menlo','Consolas',monospace`;
+    c.textBaseline = 'top';
+    const baseAlpha = 0.45 + strength * 0.5;
+
+    for (let row = 0; row < rows; row++) {
+      const line = lines[row];
+      for (let col = 0; col < line.length; col++) {
+        const glyph = line[col];
+        if (glyph === ' ') continue;
+        const cellX = col * CELL;
+        const cellY = row * CELL;
+
+        // Cursor focus boost — cells closer to cursor are more opaque
+        let alpha = baseAlpha;
+        if (hoverPxSm) {
+          const cellCx = cellX + CELL / 2;
+          const cellCy = cellY + CELL / 2;
+          const d = Math.hypot(cellCx - cursorX, cellCy - cursorY);
+          if (d < radiusPx) {
+            alpha = Math.min(1, baseAlpha + proxFromDist(d, radiusPx) * (1 - baseAlpha));
+          }
+        }
+
+        const o  = (row * frame.columns + col) * 3;
+        const fr = frame.colors ? frame.colors[o]     : 230;
+        const fg = frame.colors ? frame.colors[o + 1] : 230;
+        const fb = frame.colors ? frame.colors[o + 2] : 230;
+
+        c.save();
+        c.globalAlpha = alpha;
+        // Tiny dark shadow boosts readability over light photo regions
+        c.shadowColor = 'rgba(0,0,0,0.55)';
+        c.shadowBlur = 1.5;
+        c.fillStyle = pal.fgFn(fr, fg, fb);
+        c.fillText(glyph, cellX, cellY);
+        c.restore();
+      }
+    }
     return;
   }
 
