@@ -1351,6 +1351,51 @@ dockRender.addEventListener('click',  () => {
   else btnPng.click();
 });
 
+// ── Quick action strip — render-mode pills + HIDE + LIGHT ───────────────────
+
+const qsModes = document.querySelectorAll<HTMLButtonElement>('.qs-mode');
+qsModes.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode!;
+    qsModes.forEach(b => b.classList.toggle('active', b === btn));
+    // Drive the existing render-mode dropdown so all state stays in sync
+    renderModeSelect.value = mode;
+    renderModeSelect.dispatchEvent(new Event('change'));
+  });
+});
+// Reflect render-mode select changes back into the strip
+renderModeSelect.addEventListener('change', () => {
+  const cur = renderModeSelect.value;
+  qsModes.forEach(b => b.classList.toggle('active', b.dataset.mode === cur));
+});
+
+// HIDE UI — Esc or click to bring it back
+const qsHide   = document.getElementById('qsHide')!;
+const showUiBtn = document.getElementById('showUiBtn')!;
+function setHideUi(hide: boolean) {
+  document.body.classList.toggle('ui-hidden', hide);
+}
+qsHide.addEventListener('click',     () => setHideUi(true));
+showUiBtn.addEventListener('click',  () => setHideUi(false));
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.body.classList.contains('ui-hidden')) setHideUi(false);
+});
+
+// LIGHT / DARK theme toggle
+const qsTheme = document.getElementById('qsTheme')!;
+const THEME_KEY = 'ascii_studio_theme';
+function applyTheme(mode: 'light' | 'dark') {
+  document.body.classList.toggle('theme-light', mode === 'light');
+  qsTheme.textContent = mode === 'light' ? 'DARK' : 'LIGHT';
+  try { localStorage.setItem(THEME_KEY, mode); } catch {}
+}
+const savedTheme = (() => { try { return localStorage.getItem(THEME_KEY); } catch { return null; } })();
+if (savedTheme === 'light' || savedTheme === 'dark') applyTheme(savedTheme as 'light' | 'dark');
+qsTheme.addEventListener('click', () => {
+  const next = document.body.classList.contains('theme-light') ? 'dark' : 'light';
+  applyTheme(next);
+});
+
 // ── ASCII conversion ──────────────────────────────────────────────────────────
 
 // ── Custom render modes ───────────────────────────────────────────────────────

@@ -138,6 +138,95 @@
     body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
     #mainRow { display: flex; flex: 1; min-height: 0; padding: var(--gap); gap: var(--gap); }
 
+    /* ── Quick action strip — evilrabbit-inspired ── */
+    #quickStrip {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      padding: 0 22px;
+      height: 32px;
+      flex-shrink: 0;
+      font-family: -apple-system, BlinkMacSystemFont, system-ui, 'SF Pro Display', sans-serif;
+    }
+    .qs-modes, .qs-actions {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+    }
+    .qs-actions { margin-left: auto; }
+    .qs-mode, .qs-text {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 510;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: color 0.15s var(--ease);
+      font-family: inherit;
+    }
+    .qs-mode:hover, .qs-text:hover { color: var(--text); }
+    .qs-mode.active { color: var(--text); }
+
+    /* HIDE UI mode — fades out all chrome */
+    body.ui-hidden #topBar,
+    body.ui-hidden #sidebar,
+    body.ui-hidden #rightPanel,
+    body.ui-hidden #bottomDock,
+    body.ui-hidden #quickStrip,
+    body.ui-hidden #canvasToolbar,
+    body.ui-hidden .timeline { opacity: 0; pointer-events: none; transition: opacity 0.4s var(--ease); }
+    body.ui-hidden #canvasArea { border: none; box-shadow: none; }
+    body.ui-hidden #mainRow { padding: 0; gap: 0; }
+    body.ui-hidden #showUiBtn { display: flex; }
+
+    #showUiBtn {
+      display: none;
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 100;
+      padding: 7px 14px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      color: var(--text);
+      font-size: 10px;
+      font-weight: 590;
+      letter-spacing: 0.10em;
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      align-items: center;
+      transition: background 0.15s var(--ease), transform 0.1s var(--ease);
+    }
+    #showUiBtn:hover { background: var(--panel-2); }
+    #showUiBtn:active { transform: scale(0.96); }
+
+    /* Light mode variant — toggled by `body.theme-light` */
+    body.theme-light {
+      --bg:           #f5f5f7;
+      --sidebar:      rgba(255,255,255,0.86);
+      --sidebar-solid:#ffffff;
+      --panel:        #ffffff;
+      --panel-2:      #f0f0f3;
+      --panel-hover:  rgba(0,0,0,0.04);
+      --border:       rgba(0,0,0,0.08);
+      --border-2:     rgba(0,0,0,0.14);
+      --separator:    rgba(0,0,0,0.06);
+      --text:         #1a1a1f;
+      --text-2:       #424247;
+      --muted:        #8a8a91;
+      --label:        #6e6e76;
+      color: var(--text);
+    }
+    body.theme-light {
+      background:
+        linear-gradient(rgba(0,0,0,0.020) 1px, transparent 1px) 0 0 / 32px 32px,
+        linear-gradient(90deg, rgba(0,0,0,0.020) 1px, transparent 1px) 0 0 / 32px 32px,
+        var(--bg) !important;
+    }
+
     /* ── Top bar (title row) ── */
     #topBar {
       height: var(--topbar-h);
@@ -1462,6 +1551,26 @@
     <button class="topbar-play" id="tbPlay" title="Play / pause">▶</button>
   </div>
 </header>
+
+<!-- ── Quick action strip — render modes + HIDE + LIGHT (evilrabbit-style) ── -->
+<div id="quickStrip">
+  <div class="qs-modes">
+    <button class="qs-mode active" data-mode="ascii">ASCII</button>
+    <button class="qs-mode"        data-mode="halftone">HALFTONE</button>
+    <button class="qs-mode"        data-mode="block">BLOCK</button>
+    <button class="qs-mode"        data-mode="geometric">GEOMETRIC</button>
+    <button class="qs-mode"        data-mode="braille">BRAILLE</button>
+    <button class="qs-mode"        data-mode="bayer">BAYER</button>
+    <button class="qs-mode"        data-mode="overlay">OVERLAY</button>
+  </div>
+  <div class="qs-actions">
+    <button class="qs-text" id="qsHide">HIDE</button>
+    <button class="qs-text" id="qsTheme">LIGHT</button>
+  </div>
+</div>
+
+<!-- Floating button to bring chrome back when in HIDE mode -->
+<button id="showUiBtn" title="Show UI (Esc)">SHOW UI</button>
 
 <!-- Main row holds the 3 panels -->
 <div id="mainRow">
